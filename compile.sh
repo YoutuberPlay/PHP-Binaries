@@ -1,43 +1,34 @@
 #!/usr/bin/env bash
-PHP_VERSIONS=("8.1.34" "8.2.35" "8.3.36" "8.4.27" "8.5.12")
+PHP_VERSIONS=("8.0.30" "8.1.34" "8.2.35")
+PHP_VERSION_BASE="auto"
 
-#### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
-#### Use commit hashes to avoid this.
-
-
-ZLIB_VERSION="1.3.1"
+ZLIB_VERSION="1.3"
 GMP_VERSION="6.3.0"
-
-### Think twice before updating the minor/major versions of curl.
-### curl is by far the worst offender when it comes to random
-### build breakages on updates.
-CURL_VERSION="curl-8_13_0"
-
+CURL_VERSION="curl-8_5_0"
 YAML_VERSION="0.2.5"
-LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
-LIBXML_VERSION="2.15.1"
-LIBPNG_VERSION="1.6.53"
-LIBJPEG_VERSION="9f"
-OPENSSL_VERSION="3.6.0"
-LIBZIP_VERSION="1.11.4"
-SQLITE3_VERSION="3510100" #3.51.1
-LIBDEFLATE_VERSION="c8c56a20f8f621e6a966b716b31f1dedab6a41e3" #1.25 - see above note about "v" prefixes
+LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff"
+LIBXML_VERSION="2.10.1" #2.10.2 requires automake 1.16.3, which isn't easily available on Ubuntu 20.04
+LIBPNG_VERSION="1.6.40"
+LIBJPEG_VERSION="9e"
+OPENSSL_VERSION="3.1.4"
+LIBZIP_VERSION="1.10.1"
+SQLITE3_VERSION="3440200" #3.44.2
+LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f" #1.19
 
-EXT_PMMPTHREAD_VERSION="6.3.0"
-EXT_YAML_VERSION="2.3.0"
-EXT_LEVELDB_VERSION="88071eb1b1eae96af043229104b9d813f7cbe40c" #release not tagged
+EXT_PTHREADS_VERSION="4.2.2"
+EXT_PMMPTHREAD_VERSION="6.0.12"
+EXT_YAML_VERSION="2.2.3"
+EXT_LEVELDB_VERSION="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
 EXT_CHUNKUTILS2_VERSION="0.3.5"
-EXT_XDEBUG_VERSION="3.5.0"
-EXT_IGBINARY_VERSION="3.2.16"
-EXT_CRYPTO_VERSION="999b3c7edbc7f8ca4fdeb0bb4bbae488ad0daf07" #release not tagged
+EXT_XDEBUG_VERSION="3.3.0"
+EXT_IGBINARY_VERSION="3.2.15"
+EXT_CRYPTO_VERSION="0.3.2"
 EXT_RECURSIONGUARD_VERSION="0.1.0"
 EXT_LIBDEFLATE_VERSION="0.2.1"
 EXT_MORTON_VERSION="0.1.2"
 EXT_XXHASH_VERSION="0.2.0"
-EXT_ARRAYDEBUG_VERSION="0.2.1"
-EXT_ENCODING_VERSION="1.0.0"
-
-EXT_IGBINARY_VERSION_PHP85="3.2.17RC1"
+EXT_ARRAYDEBUG_VERSION="0.2.0"
+EXT_ENCODING_VERSION="0.2.3"
 
 function write_out {
 	echo "[$1] $2"
@@ -136,7 +127,6 @@ fi
 	export CXX="g++"
 	#export AR="gcc-ar"
 	export RANLIB=ranlib
-	export STRIP="strip"
 #fi
 
 COMPILE_FOR_ANDROID=no
@@ -160,10 +150,8 @@ COMPILE_GD="no"
 PM_VERSION_MAJOR=""
 
 DOWNLOAD_INSECURE="no"
-DOWNLOAD_CACHE="$DIR/download_cache"
+DOWNLOAD_CACHE=""
 SEPARATE_SYMBOLS="no"
-
-PHP_VERSION_BASE="auto"
 
 while getopts "::t:j:sdDxfgnva:P:c:l:Jiz:" OPTION; do
 
@@ -233,7 +221,7 @@ while getopts "::t:j:sdDxfgnva:P:c:l:Jiz:" OPTION; do
 			PM_VERSION_MAJOR="$OPTARG"
 			;;
 		J)
-			write_out "opt" "Compiling JIT support in OPcache"
+			write_out "opt" "Compiling JIT support in OPcache (unstable)"
 			HAVE_OPCACHE_JIT="yes"
 			;;
 		i)
@@ -251,73 +239,30 @@ while getopts "::t:j:sdDxfgnva:P:c:l:Jiz:" OPTION; do
 	esac
 done
 
-function php_version_id {
-	local PHP_VERSION="$1"
-	local PHP_VERSION_MAJOR=$(echo "$PHP_VERSION" | cut -d. -f1)
-	local PHP_VERSION_MINOR=$(echo "$PHP_VERSION" | cut -d. -f2)
-	#TODO: patch is a pain because of suffixes and we don't really need it anyway
-
-	# Use this for switching PHP version specific logic
-	local PHP_VERSION_ID=$(((PHP_VERSION_MAJOR * 10000) + (PHP_VERSION_MINOR * 100)))
-	echo "$PHP_VERSION_ID"
-}
-
-PREFERRED_PHP_VERSION_BASE=""
-case $PM_VERSION_MAJOR in
-	5)
-		PREFERRED_PHP_VERSION_BASE="8.2"
-		;;
-	"")
-		write_error "Please specify PocketMine-MP major version target with -P (e.g. -P5)"
-		exit 1
-		;;
-	\?)
-		write_error "PocketMine-MP $PM_VERSION_MAJOR is not supported by this version of the build script"
-		exit 1
-		;;
-esac
+if [ "$PM_VERSION_MAJOR" == "" ]; then
+	write_error "Please specify PocketMine-MP major version target with -P (e.g. -P4)"
+	exit 1
+fi
 
 write_out "opt" "Compiling with configuration for PocketMine-MP $PM_VERSION_MAJOR"
 
+# Default PHP base for PM4 is 8.2; override with -z (8.0 / 8.1 / 8.2)
 if [ "$PHP_VERSION_BASE" == "auto" ]; then
-	PHP_VERSION_BASE="$PREFERRED_PHP_VERSION_BASE"
-elif [ "$PHP_VERSION_BASE" != "$PREFERRED_PHP_VERSION_BASE" ]; then
-	#TODO: validate that this PHP version is able to be used
-	write_out "WARNING" "$PHP_VERSION_BASE is not the default for PocketMine-MP $PM_VERSION_MAJOR"
-	write_out "WARNING" "The build may fail, or you may not be able to use the resulting PHP binary"
+	PHP_VERSION_BASE="8.2"
 fi
 
+PHP_VERSION=""
 for version in "${PHP_VERSIONS[@]}"; do
 	if [[ "$version" == "$PHP_VERSION_BASE."* ]]; then
 		PHP_VERSION="$version"
 		break
 	fi
 done
-
 if [ "$PHP_VERSION" == "" ]; then
-	write_error "Unsupported PHP base version $PHP_VERSION_BASE"
-	write_error "Example inputs: 8.2, 8.3"
+	write_error "Unsupported PHP base version $PHP_VERSION_BASE (supported: 8.0, 8.1, 8.2)"
 	exit 1
 fi
-
-PHP_VERSION_ID=$(php_version_id "$PHP_VERSION")
-write_out "opt" "Selected PHP $PHP_VERSION ($PHP_VERSION_ID)"
-
-if [ $PHP_VERSION_ID -ge 80500 ]; then
-  EXT_IGBINARY_VERSION="$EXT_IGBINARY_VERSION_PHP85"
-fi
-if [ $PHP_VERSION_ID -ge 80400 ]; then
-  HAVE_OPCACHE_JIT="yes"
-fi
-if [ "$HAVE_OPCACHE_JIT" == "yes" ]; then
-  if [ $PHP_VERSION_ID -lt 80400 ]; then
-    write_out "WARNING" "JIT in versions below PHP 8.4 is highly unstable and not recommended"
-  else
-    write_out "WARNING" "JIT in PHP 8.4+ may be unstable, use it with caution"
-  fi
-else
-  write_out "INFO" "JIT support in OPcache won't be compiled"
-fi
+write_out "opt" "Selected PHP $PHP_VERSION"
 
 #Needed to use aliases
 shopt -s expand_aliases
@@ -355,9 +300,7 @@ function download_file {
 			echo "Cache hit for URL: $url" >> "$DIR/install.log"
 		else
 			echo "Downloading file to cache: $url" >> "$DIR/install.log"
-			#download to a tmpfile first, so that we don't leave borked cache entries for later runs
-			_download_file "$1" > "$DOWNLOAD_CACHE/.temp" 2>> "$DIR/install.log"
-			mv "$DOWNLOAD_CACHE/.temp" "$DOWNLOAD_CACHE/$cached_filename" >> "$DIR/install.log" 2>&1
+			_download_file "$1" > "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
 		fi
 		cat "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
 	else
@@ -396,7 +339,6 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 		DO_STATIC="yes"
 		OPENSSL_TARGET="linux-aarch64"
 		export ac_cv_func_fnmatch_works=yes #musl should be OK
-
 		write_out "INFO" "Cross-compiling for Android ARMv8 (aarch64)"
 	#TODO: add cross-compile for aarch64 platforms (ios, rpi)
 	else
@@ -452,7 +394,6 @@ else
 		exit 1
 	elif [ -z "$CFLAGS" ]; then
 		if [ `getconf LONG_BIT` == "64" ]; then
-			COMPILE_TARGET="linux64"
 			write_out "INFO" "Compiling for current machine using 64-bit"
 			if [ "$(uname -m)" != "aarch64" ]; then
 				CFLAGS="-m64 $CFLAGS"
@@ -466,11 +407,9 @@ else
 fi
 
 if [ "$DO_STATIC" == "yes" ]; then
-    if [ "$PHP_VERSION_ID" -lt 80500 ]; then
-		HAVE_OPCACHE="no"
-		HAVE_OPCACHE_JIT="no"
-		write_out "warning" "OPcache cannot be used on static builds prior to PHP 8.5; this may have a negative effect on performance"
-	fi
+	HAVE_OPCACHE="no" #doesn't work on static builds
+	HAVE_OPCACHE_JIT="no"
+	write_out "warning" "OPcache cannot be used on static builds; this may have a negative effect on performance"
 	if [ "$FSANITIZE_OPTIONS" != "" ]; then
 		write_out "warning" "Sanitizers cannot be used on static builds"
 	fi
@@ -487,7 +426,6 @@ if [ "$TOOLCHAIN_PREFIX" != "" ]; then
 		export RANLIB="$TOOLCHAIN_PREFIX-ranlib"
 		export CPP="$TOOLCHAIN_PREFIX-cpp"
 		export LD="$TOOLCHAIN_PREFIX-ld"
-		export STRIP="$TOOLCHAIN_PREFIX-strip"
 fi
 
 echo "#include <stdio.h>" > test.c
@@ -642,7 +580,7 @@ function build_gmp {
 		download_from_mirror "gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
 		write_configure
 		cd "$gmp_dir"
-		CFLAGS="-std=gnu17 $CFLAGS" RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
+		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
 		$EXTRA_FLAGS \
 		--disable-posix-threads \
 		--enable-static \
@@ -744,7 +682,6 @@ function build_curl {
 		--without-brotli \
 		--without-nghttp2 \
 		--without-zstd \
-		--without-libpsl \
 		--with-zlib="$INSTALL_DIR" \
 		--with-ssl="$INSTALL_DIR" \
 		--enable-threaded-resolver \
@@ -982,7 +919,6 @@ function build_libzip {
 			-DENABLE_GNUTLS=OFF \
 			-DENABLE_MBEDTLS=OFF \
 			-DENABLE_LZMA=OFF \
-			-DBUILD_OSSFUZZ=OFF \
 			-DENABLE_ZSTD=OFF >> "$DIR/install.log" 2>&1
 		write_compile
 		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
@@ -998,9 +934,9 @@ function build_libzip {
 
 function build_sqlite3 {
 	if [ "$DO_STATIC" == "yes" ]; then
-		local EXTRA_FLAGS="--disable-shared"
+		local EXTRA_FLAGS="--enable-static=yes --enable-shared=no"
 	else
-		local EXTRA_FLAGS="--disable-static"
+		local EXTRA_FLAGS="--enable-static=no --enable-shared=yes"
 	fi
 
 	write_library sqlite3 "$SQLITE3_VERSION"
@@ -1016,6 +952,7 @@ function build_sqlite3 {
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" RANLIB=$RANLIB ./configure \
 		--prefix="$INSTALL_DIR" \
 		--disable-dependency-tracking \
+		--enable-static-shell=no \
 		$EXTRA_FLAGS \
 		$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
 		write_compile
@@ -1119,8 +1056,13 @@ function get_pecl_extension {
 cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
-get_github_extension "pmmpthread" "$EXT_PMMPTHREAD_VERSION" "pmmp" "ext-pmmpthread"
-
+if [ "$PM_VERSION_MAJOR" -ge 5 ]; then
+	get_github_extension "pmmpthread" "$EXT_PMMPTHREAD_VERSION" "pmmp" "ext-pmmpthread"
+	THREAD_EXT_FLAGS="--enable-pmmpthread"
+else
+	get_github_extension "pthreads" "$EXT_PTHREADS_VERSION" "pmmp" "ext-pmmpthread" #"v" needed for release tags because github removes the "v"
+	THREAD_EXT_FLAGS="--enable-pthreads"
+fi
 
 get_github_extension "yaml" "$EXT_YAML_VERSION" "php" "pecl-file_formats-yaml"
 #get_pecl_extension "yaml" "$EXT_YAML_VERSION"
@@ -1150,32 +1092,6 @@ get_github_extension "xxhash" "$EXT_XXHASH_VERSION" "pmmp" "ext-xxhash"
 get_github_extension "arraydebug" "$EXT_ARRAYDEBUG_VERSION" "pmmp" "ext-arraydebug"
 
 get_github_extension "encoding" "$EXT_ENCODING_VERSION" "pmmp" "ext-encoding"
-
-cafile=""
-if [[ "$COMPILE_TARGET" == "mac"* ]]; then
-	cafile="/etc/ssl/cert.pem"
-elif [[ "$COMPILE_TARGET" == "linux"* ]] && [[ "$IS_CROSSCOMPILE" != "yes" ]]; then
-	#try to detect the correct location from the current system
-	for file in \
-		"$SSL_CERT_FILE" \
-		"/etc/ssl/certs/ca-certificates.crt" \
-		"/etc/pki/tls/certs/ca-bundle-crt" \
-		"/etc/ssl/cert.pem";
-	do
-		if [ -f "$file" ]; then
-			cafile="$file"
-			break
-		fi
-	done
-else
-	echo "wtf $COMPILE_TARGET"
-fi
-if [ -z "$cafile" ]; then
-	write_out "WARNING" "Don't know where to find SSL CA bundle for this target; PHP code won't be able to safely access https:// links unless openssl.cafile is configured to the correct path in php.ini"
-else
-	write_out "INFO" "System SSL CA bundle detected as $cafile; if this is not correct, please adjust openssl.cafile in php.ini"
-
-fi
 
 write_library "PHP" "$PHP_VERSION"
 
@@ -1209,16 +1125,6 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 		if [ "$COMPILE_FOR_ANDROID" == "no" ]; then
 			export LIBS="$LIBS -lpthread -ldl -lresolv"
 		else
-			#workarounds for musl 1.2.5
-			if [ "$PHP_VERSION_ID" -lt 80400 ]; then
-				sed -i=".backup" 's/cookie_io_functions_use_off64_t=yes/cookie_io_functions_use_off64_t=no/' ./configure
-				export ac_cv_pread=yes
-				export ac_cv_pwrite=yes
-			else
-				export php_cv_type_cookie_off64_t=no
-				export php_cv_func_pread=yes
-				export php_cv_func_pwrite=yes
-			fi
 			export LIBS="$LIBS -lpthread -lresolv"
 		fi
 	else
@@ -1276,7 +1182,7 @@ $HAS_DEBUG \
 --enable-mbstring \
 --disable-mbregex \
 --enable-calendar \
---enable-pmmpthread \
+$THREAD_EXT_FLAGS \
 --enable-fileinfo \
 --with-libxml \
 --enable-xml \
@@ -1382,14 +1288,9 @@ echo "error_reporting=-1" >> "$INSTALL_DIR/bin/php.ini"
 echo "display_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "display_startup_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" >> "$INSTALL_DIR/bin/php.ini"
-if [ -n "$cafile" ]; then
-	echo "openssl.cafile=$cafile" >> "$INSTALL_DIR/bin/php.ini"
-fi
 
 if [ "$HAVE_OPCACHE" == "yes" ]; then
-	if [ "$PHP_VERSION_ID" -lt 80500 ]; then
-		echo "zend_extension=opcache.so" >> "$INSTALL_DIR/bin/php.ini"
-	fi
+	echo "zend_extension=opcache.so" >> "$INSTALL_DIR/bin/php.ini"
 	echo "opcache.enable=1" >> "$INSTALL_DIR/bin/php.ini"
 	echo "opcache.enable_cli=1" >> "$INSTALL_DIR/bin/php.ini"
 	echo "opcache.save_comments=1" >> "$INSTALL_DIR/bin/php.ini"
@@ -1400,13 +1301,13 @@ if [ "$HAVE_OPCACHE" == "yes" ]; then
 	if [ "$HAVE_OPCACHE_JIT" == "yes" ]; then
 		echo "" >> "$INSTALL_DIR/bin/php.ini"
 		echo "; ---- ! WARNING ! ----" >> "$INSTALL_DIR/bin/php.ini"
-		echo "; JIT can provide big performance improvements, but it may make your server crash or behave in weird ways. Use it at your own risk." >> "$INSTALL_DIR/bin/php.ini"
-		echo "; See https://www.php.net/manual/en/opcache.configuration.php#ini.opcache.jit for possible options." >> "$INSTALL_DIR/bin/php.ini"
+		echo "; JIT can provide big performance improvements, but as of PHP $PHP_VERSION it is still unstable. For this reason, it is disabled by default." >> "$INSTALL_DIR/bin/php.ini"
+		echo "; Enable it at your own risk. See https://www.php.net/manual/en/opcache.configuration.php#ini.opcache.jit for possible options." >> "$INSTALL_DIR/bin/php.ini"
 		echo "opcache.jit=off" >> "$INSTALL_DIR/bin/php.ini"
 		echo "opcache.jit_buffer_size=128M" >> "$INSTALL_DIR/bin/php.ini"
 	fi
 fi
-if [[ "$COMPILE_TARGET" == "mac-"* ]]; then
+if [ "$COMPILE_TARGET" == "mac-"* ]; then
 	#we don't have permission to allocate executable memory on macOS due to not being codesigned
 	#workaround this for now by disabling PCRE JIT
 	echo "" >> "$INSTALL_DIR/bin/php.ini"
@@ -1440,6 +1341,28 @@ if [[ "$HAVE_XDEBUG" == "yes" ]]; then
 	write_out INFO "Xdebug is included, but disabled by default. To enable it, change 'xdebug.mode' in your php.ini file."
 fi
 
+function separate_symbols {
+	local libname="$1"
+	local output_dirname
+
+	output_dirname="$SYMBOLS_DIR/$(dirname $libname)"
+	mkdir -p "$output_dirname" >> "$DIR/install.log" 2>&1
+	cp "$libname" "$SYMBOLS_DIR/$libname.debug" >> "$DIR/install.log" 2>&1
+	strip -S "$libname" >> "$DIR/install.log" 2>&1 || rm "$SYMBOLS_DIR/$libname.debug" #if this fails, this probably isn't an executable binary
+}
+
+if [ "$SEPARATE_SYMBOLS" != "no" ]; then
+	echo -n "[INFO] Separating debugging symbols into $SYMBOLS_DIR..."
+	cd "$INSTALL_DIR"
+	find "lib" \( -name '*.so' -o -name '*.so.*' -o -name '*.dylib' -o -name '*.dylib.*' \) -print0 | while IFS= read -r -d '' file; do
+		separate_symbols "$file"
+	done
+	for file in "bin/"*; do
+		separate_symbols "$file"
+	done
+	cd "$DIR"
+	write_done
+fi
 
 cd "$DIR"
 if [ "$DO_CLEANUP" == "yes" ]; then
@@ -1456,22 +1379,6 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -r -f "$INSTALL_DIR/lib/"*.a >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/lib/"*.la >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/include" >> "$DIR/install.log" 2>&1
-fi
-
-if [ "$SEPARATE_SYMBOLS" != "no" ]; then
-	echo -n "[INFO] Separating debugging symbols into $SYMBOLS_DIR..."
-	rm -rf "$SYMBOLS_DIR" || true 2>&1
-	mkdir -p "$SYMBOLS_DIR" || true 2>&1
-	cp -r "$INSTALL_DIR"/* "$SYMBOLS_DIR"
-	cd "$INSTALL_DIR"
-	find "lib" \( -name '*.so' -o -name '*.so.*' -o -name '*.dylib' -o -name '*.dylib.*' \) -print0 | while IFS= read -r -d '' file; do
-		"$STRIP" -S "$file" >> "$DIR/install.log" 2>&1 || true #if this fails, this probably isn't an executable binary
-	done
-	for file in "bin/"*; do
-		"$STRIP" -S "$file" >> "$DIR/install.log" 2>&1 || true #if this fails, this probably isn't an executable binary
-	done
-	cd "$DIR"
-	write_done
 fi
 
 date >> "$DIR/install.log" 2>&1
