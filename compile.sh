@@ -1125,6 +1125,15 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 		if [ "$COMPILE_FOR_ANDROID" == "no" ]; then
 			export LIBS="$LIBS -lpthread -ldl -lresolv"
 		else
+			# musl 1.2.5 dropped off64_t from default feature macros; PHP's configure
+			# guesses wrong and enables cookie_io_functions_use_off64_t,
+			# which breaks main/streams/cast.c with "unknown type name off64_t".
+			sed -i=".backup" 's/cookie_io_functions_use_off64_t=yes/cookie_io_functions_use_off64_t=no/' ./configure
+			export ac_cv_pread=yes
+			export ac_cv_pwrite=yes
+			export php_cv_type_cookie_off64_t=no
+			export php_cv_func_pread=yes
+			export php_cv_func_pwrite=yes
 			export LIBS="$LIBS -lpthread -lresolv"
 		fi
 	else
