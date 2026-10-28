@@ -2,33 +2,84 @@
 PHP_VERSIONS=("8.0.30" "8.1.34" "8.2.35")
 PHP_VERSION_BASE="auto"
 
+# ----- base library versions (shared) -----
 ZLIB_VERSION="1.3"
 GMP_VERSION="6.3.0"
-CURL_VERSION="curl-8_5_0"
 YAML_VERSION="0.2.5"
 LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff"
 LIBXML_VERSION="2.10.1" #2.10.2 requires automake 1.16.3, which isn't easily available on Ubuntu 20.04
-LIBPNG_VERSION="1.6.40"
-LIBJPEG_VERSION="9e"
-OPENSSL_VERSION="3.1.4"
 LIBZIP_VERSION="1.10.1"
-SQLITE3_VERSION="3440200" #3.44.2
-LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f" #1.19
 
+# ----- old generation (PHP 8.0) -----
+# PHP 8.0 cannot be built against OpenSSL 3.x (missing RSA_SSLV23_PADDING etc.)
+OPENSSL_VERSION_80="1.1.1w"
+CURL_VERSION_80="curl-8_5_0"
+LIBPNG_VERSION_80="1.6.40"
+LIBJPEG_VERSION_80="9e"
+SQLITE3_VERSION_80="3440200"   # 3.44.2
+LIBDEFLATE_VERSION_80="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f" # 1.19
+
+# ----- modern generation (PHP 8.1 / 8.2) -----
+OPENSSL_VERSION_MODERN="3.2.1"
+CURL_VERSION_MODERN="curl-8_7_1"
+LIBPNG_VERSION_MODERN="1.6.43"
+LIBJPEG_VERSION_MODERN="9f"
+SQLITE3_VERSION_MODERN="3450200"   # 3.45.2
+LIBDEFLATE_VERSION_MODERN="275aa5141db6eda3587214e0f1d3a134768f557d" # 1.20
+
+# Resolved below based on PHP_VERSION
+OPENSSL_VERSION=""
+CURL_VERSION=""
+LIBPNG_VERSION=""
+LIBJPEG_VERSION=""
+SQLITE3_VERSION=""
+LIBDEFLATE_VERSION=""
+
+# ----- extension versions -----
 EXT_PTHREADS_VERSION="4.2.2"
 EXT_PMMPTHREAD_VERSION="6.0.12"
-EXT_YAML_VERSION="2.2.3"
-EXT_LEVELDB_VERSION="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
-EXT_CHUNKUTILS2_VERSION="0.3.5"
-EXT_XDEBUG_VERSION="3.3.0"
-EXT_IGBINARY_VERSION="3.2.15"
-EXT_CRYPTO_VERSION="0.3.2"
-EXT_RECURSIONGUARD_VERSION="0.1.0"
-EXT_LIBDEFLATE_VERSION="0.2.1"
-EXT_MORTON_VERSION="0.1.2"
-EXT_XXHASH_VERSION="0.2.0"
-EXT_ARRAYDEBUG_VERSION="0.2.0"
-EXT_ENCODING_VERSION="0.2.3"
+
+# Old generation (PHP 8.0)
+EXT_YAML_VERSION_80="2.2.3"
+EXT_LEVELDB_VERSION_80="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
+EXT_CHUNKUTILS2_VERSION_80="0.3.5"
+EXT_XDEBUG_VERSION_80="3.3.0"
+EXT_IGBINARY_VERSION_80="3.2.15"
+EXT_CRYPTO_VERSION_80="0.3.2"
+EXT_RECURSIONGUARD_VERSION_80="0.1.0"
+EXT_LIBDEFLATE_VERSION_80="0.2.1"
+EXT_MORTON_VERSION_80="0.1.2"
+EXT_XXHASH_VERSION_80="0.2.0"
+EXT_ARRAYDEBUG_VERSION_80="0.2.0"
+EXT_ENCODING_VERSION_80="0.2.3"
+
+# Modern generation (PHP 8.1 / 8.2)
+EXT_YAML_VERSION_MODERN="2.2.3"
+EXT_LEVELDB_VERSION_MODERN="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
+EXT_CHUNKUTILS2_VERSION_MODERN="0.3.5"
+EXT_XDEBUG_VERSION_MODERN="3.3.1"
+EXT_IGBINARY_VERSION_MODERN="3.2.15"
+EXT_CRYPTO_VERSION_MODERN="abbe7cbf869f96e69f2ce897271a61d32f43c7c0"
+EXT_RECURSIONGUARD_VERSION_MODERN="0.1.0"
+EXT_LIBDEFLATE_VERSION_MODERN="0.2.1"
+EXT_MORTON_VERSION_MODERN="0.1.2"
+EXT_XXHASH_VERSION_MODERN="0.2.0"
+EXT_ARRAYDEBUG_VERSION_MODERN="0.2.0"
+EXT_ENCODING_VERSION_MODERN="0.3.0"
+
+# Resolved below based on PHP_VERSION
+EXT_YAML_VERSION=""
+EXT_LEVELDB_VERSION=""
+EXT_CHUNKUTILS2_VERSION=""
+EXT_XDEBUG_VERSION=""
+EXT_IGBINARY_VERSION=""
+EXT_CRYPTO_VERSION=""
+EXT_RECURSIONGUARD_VERSION=""
+EXT_LIBDEFLATE_VERSION=""
+EXT_MORTON_VERSION=""
+EXT_XXHASH_VERSION=""
+EXT_ARRAYDEBUG_VERSION=""
+EXT_ENCODING_VERSION=""
 
 function write_out {
 	echo "[$1] $2"
@@ -262,7 +313,52 @@ if [ "$PHP_VERSION" == "" ]; then
 	write_error "Unsupported PHP base version $PHP_VERSION_BASE (supported: 8.0, 8.1, 8.2)"
 	exit 1
 fi
-write_out "opt" "Selected PHP $PHP_VERSION"
+
+if [[ "$PHP_VERSION" == 8.0.* ]]; then
+	# PHP 8.0 cannot be built against OpenSSL 3.x -> use the older generation
+	OPENSSL_VERSION="$OPENSSL_VERSION_80"
+	CURL_VERSION="$CURL_VERSION_80"
+	LIBPNG_VERSION="$LIBPNG_VERSION_80"
+	LIBJPEG_VERSION="$LIBJPEG_VERSION_80"
+	SQLITE3_VERSION="$SQLITE3_VERSION_80"
+	LIBDEFLATE_VERSION="$LIBDEFLATE_VERSION_80"
+
+	EXT_YAML_VERSION="$EXT_YAML_VERSION_80"
+	EXT_LEVELDB_VERSION="$EXT_LEVELDB_VERSION_80"
+	EXT_CHUNKUTILS2_VERSION="$EXT_CHUNKUTILS2_VERSION_80"
+	EXT_XDEBUG_VERSION="$EXT_XDEBUG_VERSION_80"
+	EXT_IGBINARY_VERSION="$EXT_IGBINARY_VERSION_80"
+	EXT_CRYPTO_VERSION="$EXT_CRYPTO_VERSION_80"
+	EXT_RECURSIONGUARD_VERSION="$EXT_RECURSIONGUARD_VERSION_80"
+	EXT_LIBDEFLATE_VERSION="$EXT_LIBDEFLATE_VERSION_80"
+	EXT_MORTON_VERSION="$EXT_MORTON_VERSION_80"
+	EXT_XXHASH_VERSION="$EXT_XXHASH_VERSION_80"
+	EXT_ARRAYDEBUG_VERSION="$EXT_ARRAYDEBUG_VERSION_80"
+	EXT_ENCODING_VERSION="$EXT_ENCODING_VERSION_80"
+else
+	# PHP 8.1 / 8.2 -> modern generation
+	OPENSSL_VERSION="$OPENSSL_VERSION_MODERN"
+	CURL_VERSION="$CURL_VERSION_MODERN"
+	LIBPNG_VERSION="$LIBPNG_VERSION_MODERN"
+	LIBJPEG_VERSION="$LIBJPEG_VERSION_MODERN"
+	SQLITE3_VERSION="$SQLITE3_VERSION_MODERN"
+	LIBDEFLATE_VERSION="$LIBDEFLATE_VERSION_MODERN"
+
+	EXT_YAML_VERSION="$EXT_YAML_VERSION_MODERN"
+	EXT_LEVELDB_VERSION="$EXT_LEVELDB_VERSION_MODERN"
+	EXT_CHUNKUTILS2_VERSION="$EXT_CHUNKUTILS2_VERSION_MODERN"
+	EXT_XDEBUG_VERSION="$EXT_XDEBUG_VERSION_MODERN"
+	EXT_IGBINARY_VERSION="$EXT_IGBINARY_VERSION_MODERN"
+	EXT_CRYPTO_VERSION="$EXT_CRYPTO_VERSION_MODERN"
+	EXT_RECURSIONGUARD_VERSION="$EXT_RECURSIONGUARD_VERSION_MODERN"
+	EXT_LIBDEFLATE_VERSION="$EXT_LIBDEFLATE_VERSION_MODERN"
+	EXT_MORTON_VERSION="$EXT_MORTON_VERSION_MODERN"
+	EXT_XXHASH_VERSION="$EXT_XXHASH_VERSION_MODERN"
+	EXT_ARRAYDEBUG_VERSION="$EXT_ARRAYDEBUG_VERSION_MODERN"
+	EXT_ENCODING_VERSION="$EXT_ENCODING_VERSION_MODERN"
+fi
+
+write_out "opt" "Selected PHP $PHP_VERSION (OpenSSL $OPENSSL_VERSION, curl $CURL_VERSION)"
 
 #Needed to use aliases
 shopt -s expand_aliases
@@ -611,12 +707,22 @@ function build_openssl {
 	fi
 
 	write_library openssl "$OPENSSL_VERSION"
-	local openssl_dir="./openssl-openssl-$OPENSSL_VERSION"
+
+	# OpenSSL 1.1.x is published only on openssl.org, not on GitHub.
+	if [ "$OPENSSL_VERSION" == "$OPENSSL_VERSION_80" ]; then
+		local openssl_dir="./openssl-$OPENSSL_VERSION"
+	else
+		local openssl_dir="./openssl-openssl-$OPENSSL_VERSION"
+	fi
 
 	if cant_use_cache "$openssl_dir"; then
 		rm -rf "$openssl_dir"
 		write_download
-		download_github_src "openssl/openssl" "openssl-$OPENSSL_VERSION" "openssl" | tar -zx >> "$DIR/install.log" 2>&1
+		if [ "$OPENSSL_VERSION" == "$OPENSSL_VERSION_80" ]; then
+			download_file "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" "openssl" | tar -zx >> "$DIR/install.log" 2>&1
+		else
+			download_github_src "openssl/openssl" "openssl-$OPENSSL_VERSION" "openssl" | tar -zx >> "$DIR/install.log" 2>&1
+		fi
 
 		write_configure
 		cd "$openssl_dir"
@@ -744,7 +850,6 @@ function build_leveldb {
 		rm -rf "$leveldb_dir"
 		write_download
 		download_github_src "pmmp/leveldb" "$LEVELDB_VERSION" "leveldb" | tar -zx >> "$DIR/install.log" 2>&1
-		#download_file "https://github.com/Mojang/leveldb-mcpe/archive/$LEVELDB_VERSION.tar.gz" | tar -zx >> "$DIR/install.log" 2>&1
 
 		write_configure
 		cd "$leveldb_dir"
@@ -1337,7 +1442,7 @@ if [[ "$HAVE_XDEBUG" == "yes" ]]; then
 	write_install
 	make install >> "$DIR/install.log" 2>&1
 	echo "" >> "$INSTALL_DIR/bin/php.ini" 2>&1
-	echo ";WARNING: When loaded, xdebug 3.2.0 will cause segfaults whenever an uncaught error is thrown, even if xdebug.mode=off. Load it at your own risk." >> "$INSTALL_DIR/bin/php.ini" 2>&1
+	echo ";WARNING: When loaded, xdebug 3.x will cause segfaults whenever an uncaught error is thrown, even if xdebug.mode=off. Load it at your own risk." >> "$INSTALL_DIR/bin/php.ini" 2>&1
 	echo ";zend_extension=xdebug.so" >> "$INSTALL_DIR/bin/php.ini" 2>&1
 	echo ";https://xdebug.org/docs/all_settings#mode" >> "$INSTALL_DIR/bin/php.ini" 2>&1
 	echo "xdebug.mode=off" >> "$INSTALL_DIR/bin/php.ini" 2>&1
@@ -1355,8 +1460,7 @@ function separate_symbols {
 	local output_dirname
 
 	output_dirname="$SYMBOLS_DIR/$(dirname $libname)"
-	mkdir -p "$output_dirname" >> "$DIR/install.log" 2>&1
-	cp "$libname" "$SYMBOLS_DIR/$libname.debug" >> "$DIR/install.log" 2>&1
+	mkdir -p "$output_dirname" >> "$DIR/install.log" 2>&1	cp "$libname" "$SYMBOLS_DIR/$libname.debug" >> "$DIR/install.log" 2>&1
 	strip -S "$libname" >> "$DIR/install.log" 2>&1 || rm "$SYMBOLS_DIR/$libname.debug" #if this fails, this probably isn't an executable binary
 }
 
