@@ -10,7 +10,6 @@ LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff"
 LIBXML_VERSION="2.10.1"
 LIBZIP_VERSION="1.5.2"
 
-# ----- per-generation resolved below -----
 OPENSSL_VERSION=""
 CURL_VERSION=""
 LIBPNG_VERSION=""
@@ -29,35 +28,36 @@ EXT_RECURSIONGUARD_VERSION=""
 EXT_DS_VERSION=""
 EXT_WEAKREF_VERSION=""
 
-# ----- default generation values (PHP 7.3 / 7.4 - checked in appveyor build) -----
+# ----- PHP 7.2 / 7.3 / 7.4 generation (matches 7.3.7 appveyor) -----
 OPENSSL_VERSION_7X="1.1.1w"
-CURL_VERSION_7X="curl-8_5_0"
+CURL_VERSION_7X="curl-7_71_1"
 LIBPNG_VERSION_7X="1.6.40"
 LIBJPEG_VERSION_7X="9e"
-SQLITE3_VERSION_7X="3240000"       # 3.24.0 (as in 7.3.7 appveyor)
+SQLITE3_VERSION_7X="3240000"        # 3.24.0 (as in 7.3.7 appveyor)
 LIBDEFLATE_VERSION_7X="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f"
-EXT_PTHREADS_VERSION_7X="3.2.1dev" # krakjoe/pthreads, not pmmp fork
+EXT_PTHREADS_VERSION_7X="3.2.1dev"
 EXT_YAML_VERSION_7X="2.0.4"
 EXT_LEVELDB_VERSION_7X="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3" # ext 0.2.1 / lib 1.20
-EXT_CHUNKUTILS_VERSION_7X="0.2.0" # old pocketmine_chunkutils
-EXT_XDEBUG_VERSION_7X="2.9.8"     # xdebug 3.x requires PHP 8; 2.9.x supports 7.0-7.4
+EXT_CHUNKUTILS_VERSION_7X="0.2.0"
+EXT_XDEBUG_VERSION_7X="2.9.8"
 EXT_IGBINARY_VERSION_7X="3.0.1"
 EXT_CRYPTO_VERSION_7X="0.3.1"
 EXT_RECURSIONGUARD_VERSION_7X="0.1.0"
 EXT_DS_VERSION_7X="1.2.9"
-EXT_WEAKREF_VERSION_7X=""
 
-# ----- PHP 7.4 specific (newer extensions still work) -----
+# ----- PHP 7.4 (slightly newer extensions still compatible) -----
 EXT_IGBINARY_VERSION_74="3.2.4"
 EXT_CRYPTO_VERSION_74="0.3.2"
 EXT_LEVELDB_VERSION_74="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
 EXT_PTHREADS_VERSION_74="3.2.1dev"
 
-# ----- PHP 7.0 specific -----
+# ----- PHP 7.0 (per 7.0.23 reference: no leveldb, no crypto, no igbinary, no ds) -----
+OPENSSL_VERSION_70="1.1.1w"
+CURL_VERSION_70="curl-7_65_1"
 EXT_PTHREADS_VERSION_70="3.1.6"
 EXT_WEAKREF_VERSION_70="0.3.3"
-EXT_DS_VERSION_70="1.2.9"
-OPENSSL_VERSION_70="1.1.0l"
+EXT_DS_VERSION_70=""                # 7.0.23 had no ds
+EXT_CHUNKUTILS_VERSION_70=""        # 7.0.23 had no chunkutils
 
 function write_out()   { echo "[$1] $2"; }
 function write_error() { write_out ERROR "$1" >&2; }
@@ -70,12 +70,10 @@ function write_compile()  { write_status "compiling"; }
 function write_install()  { write_status "installing"; }
 function write_done()     { echo " done!"; }
 
-function cant_use_cache {
-	if [ -f "$1/.compile.sh.cache" ]; then return 1; else return 0; fi
-}
+function cant_use_cache { [ -f "$1/.compile.sh.cache" ] && return 1; return 0; }
 function mark_cache { touch "./.compile.sh.cache"; }
 
-write_out "PocketMine" "PHP 7.x compiler (PM4 legacy / old cores)"
+write_out "PocketMine" "PHP 7.x compiler (legacy / old cores)"
 DIR="$(pwd)"
 BASE_BUILD_DIR="$DIR/install_data"
 BUILD_DIR="$BASE_BUILD_DIR/subdir"
@@ -108,11 +106,12 @@ DO_STATIC="no"
 DO_CLEANUP="yes"
 COMPILE_DEBUG="no"
 HAVE_VALGRIND="--without-valgrind"
-HAVE_OPCACHE="no"   # disabled in 7.3.7 appveyor build
+HAVE_OPCACHE="no"
 COMPILE_GD="no"
 PM_VERSION_MAJOR=""
 DOWNLOAD_INSECURE="no"
 DOWNLOAD_CACHE=""
+SEPARATE_SYMBOLS="no"
 
 while getopts "::t:j:sdDxfgnva:P:c:l:gz:" OPTION; do
 	case $OPTION in
@@ -137,19 +136,15 @@ while getopts "::t:j:sdDxfgnva:P:c:l:gz:" OPTION; do
 done
 
 if [ "$PM_VERSION_MAJOR" == "" ]; then
-	write_error "Please specify PocketMine-MP major version target with -P (e.g. -P4)"
+	write_error "Please specify PocketMine-MP major version target with -P (e.g. -P3)"
 	exit 1
 fi
 
-if [ "$PHP_VERSION_BASE" == "auto" ]; then
-	PHP_VERSION_BASE="7.3"
-fi
+if [ "$PHP_VERSION_BASE" == "auto" ]; then PHP_VERSION_BASE="7.3"; fi
 
 PHP_VERSION=""
 for v in "${PHP_VERSIONS[@]}"; do
-	if [[ "$v" == "$PHP_VERSION_BASE."* ]]; then
-		PHP_VERSION="$v"; break
-	fi
+	if [[ "$v" == "$PHP_VERSION_BASE."* ]]; then PHP_VERSION="$v"; break; fi
 done
 if [ "$PHP_VERSION" == "" ]; then
 	write_error "Unsupported PHP base version $PHP_VERSION_BASE (supported: 7.0, 7.2, 7.3, 7.4)"
@@ -159,18 +154,18 @@ fi
 # ---- resolve versions by generation ----
 if [[ "$PHP_VERSION" == 7.0.* ]]; then
 	OPENSSL_VERSION="$OPENSSL_VERSION_70"
-	CURL_VERSION="$CURL_VERSION_7X"
+	CURL_VERSION="$CURL_VERSION_70"
 	LIBPNG_VERSION="$LIBPNG_VERSION_7X"
 	LIBJPEG_VERSION="$LIBJPEG_VERSION_7X"
 	SQLITE3_VERSION="$SQLITE3_VERSION_7X"
 	LIBDEFLATE_VERSION="$LIBDEFLATE_VERSION_7X"
 	EXT_PTHREADS_VERSION="$EXT_PTHREADS_VERSION_70"
 	EXT_YAML_VERSION="$EXT_YAML_VERSION_7X"
-	EXT_LEVELDB_VERSION=""           # no leveldb on 7.0
-	EXT_CHUNKUTILS_VERSION="$EXT_CHUNKUTILS_VERSION_7X"
+	EXT_LEVELDB_VERSION=""
+	EXT_CHUNKUTILS_VERSION="$EXT_CHUNKUTILS_VERSION_70"
 	EXT_XDEBUG_VERSION="$EXT_XDEBUG_VERSION_7X"
-	EXT_IGBINARY_VERSION=""          # no igbinary on 7.0
-	EXT_CRYPTO_VERSION=""            # no crypto on 7.0
+	EXT_IGBINARY_VERSION=""
+	EXT_CRYPTO_VERSION=""
 	EXT_RECURSIONGUARD_VERSION="$EXT_RECURSIONGUARD_VERSION_7X"
 	EXT_DS_VERSION="$EXT_DS_VERSION_70"
 	EXT_WEAKREF_VERSION="$EXT_WEAKREF_VERSION_70"
@@ -192,7 +187,6 @@ elif [[ "$PHP_VERSION" == 7.4.* ]]; then
 	EXT_DS_VERSION="$EXT_DS_VERSION_7X"
 	EXT_WEAKREF_VERSION=""
 else
-	# 7.2, 7.3
 	OPENSSL_VERSION="$OPENSSL_VERSION_7X"
 	CURL_VERSION="$CURL_VERSION_7X"
 	LIBPNG_VERSION="$LIBPNG_VERSION_7X"
@@ -211,9 +205,8 @@ else
 	EXT_WEAKREF_VERSION=""
 fi
 
-write_out "opt" "Selected PHP $PHP_VERSION (OpenSSL $OPENSSL_VERSION, pthreads $EXT_PTHREADS_VERSION)"
+write_out "opt" "Selected PHP $PHP_VERSION (OpenSSL $OPENSSL_VERSION, curl $CURL_VERSION, pthreads $EXT_PTHREADS_VERSION)"
 
-# ---- downloads ----
 shopt -s expand_aliases
 if type wget >/dev/null 2>&1; then
 	WGET_FLAGS=""
@@ -240,7 +233,6 @@ function download_file {
 }
 function download_github_src { download_file "https://github.com/$1/archive/$2.tar.gz" "$3"; }
 
-# ---- toolchain / target ----
 GMP_ABI=""
 TOOLCHAIN_PREFIX=""
 OPENSSL_TARGET=""
@@ -262,35 +254,25 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 		export ac_cv_func_fnmatch_works=yes
 		write_out "INFO" "Cross-compiling for Android ARMv8 (aarch64)"
 	else
-		write_error "Only android-aarch64 is supported for cross-compile"
-		exit 1
+		write_error "Only android-aarch64 is supported for cross-compile"; exit 1
 	fi
 else
 	if [[ "$COMPILE_TARGET" == "linux" ]] || [[ "$COMPILE_TARGET" == "linux64" ]]; then
 		[ -z "$march" ] && march=x86-64
 		[ -z "$mtune" ] && mtune=skylake
-		CFLAGS="$CFLAGS -m64"
-		GMP_ABI="64"
+		CFLAGS="$CFLAGS -m64"; GMP_ABI="64"
 		OPENSSL_TARGET="linux-x86_64"
 	elif [[ "$COMPILE_TARGET" != "" ]]; then
-		write_error "Unsupported compile target $COMPILE_TARGET"
-		exit 1
+		write_error "Unsupported compile target $COMPILE_TARGET"; exit 1
 	elif [ -z "$CFLAGS" ]; then
 		if [ `getconf LONG_BIT` == "64" ]; then
 			[ "$(uname -m)" != "aarch64" ] && CFLAGS="-m64 $CFLAGS"
 			GMP_ABI="64"
-		else
-			write_error "32-bit is not supported"; exit 1
-		fi
+		else write_error "32-bit is not supported"; exit 1; fi
 	fi
 fi
 
-if [ "$DO_STATIC" == "yes" ]; then
-	HAVE_OPCACHE="no"
-	if [ "$HAVE_XDEBUG" == "yes" ]; then
-		HAVE_XDEBUG="no"
-	fi
-fi
+if [ "$DO_STATIC" == "yes" ]; then HAVE_OPCACHE="no"; fi
 
 if [ "$TOOLCHAIN_PREFIX" != "" ]; then
 	export CC="$TOOLCHAIN_PREFIX-gcc"
@@ -301,18 +283,12 @@ if [ "$TOOLCHAIN_PREFIX" != "" ]; then
 	export LD="$TOOLCHAIN_PREFIX-ld"
 fi
 
-if [ -z "$THREADS" ]; then
-	THREADS=1
-fi
+[ -z "$THREADS" ] && THREADS=1
 [ -z "$march" ] && march=native
 [ -z "$mtune" ] && mtune=native
 [ -z "$CFLAGS" ] && CFLAGS=""
 [ -z "$CONFIGURE_FLAGS" ] && CONFIGURE_FLAGS=""
 [ -z "$LDFLAGS" ] && LDFLAGS=""
-
-if [ "$mtune" != "none" ]; then
-	$CC -march=$march -mtune=$mtune $CFLAGS -o /tmp/_t.c 2>/dev/null || true
-fi
 
 if [ "$DO_OPTIMIZE" != "no" ]; then
 	CFLAGS="$CFLAGS -O2 -ffast-math -ftree-vectorize -fomit-frame-pointer -funswitch-loops -fivopts -funsafe-loop-optimizations -fpredictive-commoning -ftracer -ftree-loop-im -frename-registers -fcx-limited-range"
@@ -337,7 +313,7 @@ download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$DIR/in
 mv php-src-php-$PHP_VERSION php
 write_done
 
-# ----- build functions -----
+# ----- library builds -----
 function build_zlib {
 	[ "$DO_STATIC" == "yes" ] && local EXTRA="--static" || local EXTRA="--shared"
 	write_library zlib "$ZLIB_VERSION"
@@ -547,7 +523,6 @@ build_gmp
 build_openssl
 build_curl
 build_yaml
-if [ -n "$EXT_LEVELDB_VERSION" ]; then build_leveldb; fi
 
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
@@ -563,6 +538,11 @@ if [ -n "$EXT_LEVELDB_VERSION" ]; then build_leveldb; fi
 build_libzip
 build_sqlite3
 
+# XML only for 7.2+, not for 7.0
+if [[ "$PHP_VERSION" != 7.0.* ]]; then
+	build_libxml2
+fi
+
 # ----- extensions -----
 function get_extension_tar_gz {
 	echo -n "  $1: downloading $2..."
@@ -577,15 +557,9 @@ function get_github_extension {
 cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
-# pthreads: 7.x uses krakjoe/pthreads, NOT pmmp fork
 if [[ "$EXT_PTHREADS_VERSION" == "3.2.1dev" ]]; then
-	echo -n "  pthreads: downloading $EXT_PTHREADS_VERSION (krakjoe master)..."
-	git clone --depth 1 https://github.com/krakjoe/pthreads.git "$BUILD_DIR/php/ext/pthreads" >> "$DIR/install.log" 2>&1
-	cd "$BUILD_DIR/php/ext/pthreads"
-	# 3.2.1dev is HEAD of v3 branch
-	git fetch --depth 1 origin v3 >> "$DIR/install.log" 2>&1 || true
-	git checkout v3 >> "$DIR/install.log" 2>&1 || true
-	cd "$BUILD_DIR"
+	echo -n "  pthreads: downloading $EXT_PTHREADS_VERSION (krakjoe v3)..."
+	git clone --depth 1 --branch v3 https://github.com/krakjoe/pthreads.git "$BUILD_DIR/php/ext/pthreads" >> "$DIR/install.log" 2>&1
 	write_done
 	THREAD_EXT_FLAGS="--enable-pthreads"
 else
@@ -645,7 +619,6 @@ fi
 if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 	sed -i=".bak" 's/pthreads_working=no/pthreads_working=yes/' ./configure 2>/dev/null || true
 	if [ "$COMPILE_FOR_ANDROID" == "yes" ]; then
-		# musl 1.2.5 workaround
 		sed -i=".bak" 's/cookie_io_functions_use_off64_t=yes/cookie_io_functions_use_off64_t=no/' ./configure 2>/dev/null || true
 		export ac_cv_pread=yes ac_cv_pwrite=yes
 		export php_cv_type_cookie_off64_t=no php_cv_func_pread=yes php_cv_func_pwrite=yes
@@ -660,10 +633,8 @@ elif [ "$DO_STATIC" == "yes" ]; then
 fi
 
 [ "$IS_WINDOWS" != "yes" ] && HAVE_PCNTL="--enable-pcntl" || HAVE_PCNTL="--disable-pcntl"
+[[ "$COMPILE_DEBUG" == "yes" ]] && HAS_DEBUG="--enable-debug" || HAS_DEBUG="--disable-debug"
 
-if [[ "$COMPILE_DEBUG" == "yes" ]]; then HAS_DEBUG="--enable-debug"; else HAS_DEBUG="--disable-debug"; fi
-
-# Build configure flags (match 7.3.7 appveyor set)
 ZIP_FLAG=""
 case "$PHP_VERSION" in
 	7.2.*|7.3.*) ZIP_FLAG="--with-libzip=$INSTALL_DIR" ;;
@@ -677,10 +648,23 @@ case "$PHP_VERSION" in
 	*) SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR" ;;
 esac
 
+XML_FLAGS=""
+if [[ "$PHP_VERSION" != 7.0.* ]]; then
+	XML_FLAGS="--with-libxml-dir=$INSTALL_DIR --enable-xml --enable-dom --enable-simplexml --enable-xmlreader --enable-xmlwriter"
+else
+	XML_FLAGS="--disable-libxml --disable-xml --disable-dom --disable-simplexml --disable-xmlreader --disable-xmlwriter"
+fi
+
+PDO_FLAGS=""
+if [[ "$PHP_VERSION" != 7.0.* ]]; then
+	PDO_FLAGS="--with-pdo-sqlite=$INSTALL_DIR --with-pdo-mysql"
+else
+	PDO_FLAGS="--disable-pdo --without-pdo-sqlite"
+fi
+
 PCNTL_EXTRA=""
 [[ "$PHP_VERSION" == 7.0.* ]] && PCNTL_EXTRA="--enable-weakref"
 
-# Extension flags
 EXTRA_EXT_FLAGS=""
 [ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils"
 [ -n "$EXT_IGBINARY_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-igbinary"
@@ -706,11 +690,10 @@ $HAS_DEBUG \
 --enable-mbstring --enable-calendar \
 $THREAD_EXT_FLAGS \
 --disable-fileinfo \
---enable-xml --enable-dom --enable-simplexml --enable-xmlreader --enable-xmlwriter \
+$XML_FLAGS \
 --disable-cgi --disable-phpdbg --disable-session \
 --without-pear --without-iconv \
---with-pdo-sqlite="$INSTALL_DIR" \
---with-pdo-mysql \
+$PDO_FLAGS \
 --with-pic --enable-phar --enable-ctype --enable-sockets \
 --enable-shared=no --enable-static=yes \
 --enable-shmop --enable-maintainer-zts \
