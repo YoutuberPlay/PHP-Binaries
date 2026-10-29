@@ -362,7 +362,7 @@ function build_gmp {
 	local d="./gmp-$GMP_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://gmplib.org/download/gmp/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
+		download_file "https://github.com/pmmp/DependencyMirror/releases/download/mirror/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
 		write_configure; cd "$d"
 		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA \
 			--disable-posix-threads --enable-static --disable-shared \
