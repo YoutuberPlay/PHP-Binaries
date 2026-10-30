@@ -539,11 +539,21 @@ function build_sqlite3 {
 		download_file "https://www.sqlite.org/$YEAR/sqlite-autoconf-$SQLITE3_VERSION.tar.gz" "sqlite3" | tar -zx >> "$DIR/install.log" 2>&1
 		mv sqlite-autoconf-$SQLITE3_VERSION "$d"
 		write_configure; cd "$d"
+
+		# SQLite explicitly refuses -ffast-math. Use a sanitized CFLAGS for this build only.
+		local SAVED_CFLAGS="$CFLAGS"
+		local SAVED_CXXFLAGS="$CXXFLAGS"
+		export CFLAGS="$(echo "$CFLAGS" | sed -e 's/-ffast-math//g' -e 's/-funsafe-math-optimizations//g' -e 's/-ffinite-math-only//g' -e 's/-fno-rounding-math//g' -e 's/-fno-signaling-nans//g' -e 's/-fno-signed-zeros//g' -e 's/-fno-trapping-math//g' -e 's/-fcx-limited-range//g' -e 's/-fno-math-errno//g' -e 's/  */ /g' | xargs)"
+		export CXXFLAGS="$(echo "$CXXFLAGS" | sed -e 's/-ffast-math//g' -e 's/-funsafe-math-optimizations//g' -e 's/-ffinite-math-only//g' -e 's/-fno-rounding-math//g' -e 's/-fno-signaling-nans//g' -e 's/-fno-signed-zeros//g' -e 's/-fno-trapping-math//g' -e 's/-fcx-limited-range//g' -e 's/-fno-math-errno//g' -e 's/  */ /g' | xargs)"
+
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" \
 			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
 			--disable-dependency-tracking --enable-static-shell=no \
 			$EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
 		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+
+		export CFLAGS="$SAVED_CFLAGS"
+		export CXXFLAGS="$SAVED_CXXFLAGS"
 	else write_caching; cd "$d"; fi
 	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
 	write_done
