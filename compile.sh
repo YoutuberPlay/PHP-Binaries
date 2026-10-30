@@ -503,22 +503,26 @@ function build_libjpeg {
 }
 
 function build_libzip {
-	[ "$DO_STATIC" == "yes" ] && local CMAKE_LIBZIP_EXTRA="-DBUILD_SHARED_LIBS=OFF" || local CMAKE_LIBZIP_EXTRA=""
-	write_library libzip "$LIBZIP_VERSION"
-	local d="./libzip-$LIBZIP_VERSION"
-	if cant_use_cache "$d"; then
-		rm -rf "$d"; write_download
-		download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
-		write_configure; cd "$d"
-		cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-			-DCMAKE_INSTALL_LIBDIR=lib $CMAKE_LIBZIP_EXTRA $CMAKE_GLOBAL_EXTRA_FLAGS \
-			-DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF \
-			-DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
-			-DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
-	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
-	write_done
+    [ "$DO_STATIC" == "yes" ] && local CMAKE_LIBZIP_EXTRA="-DBUILD_SHARED_LIBS=OFF" || local CMAKE_LIBZIP_EXTRA=""
+    write_library libzip "$LIBZIP_VERSION"
+    local d="./libzip-$LIBZIP_VERSION"
+    if cant_use_cache "$d"; then
+        rm -rf "$d"; write_download
+        download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
+        write_configure; cd "$d"
+        # Принудительно меняем SHARED на STATIC в CMakeLists.txt
+        sed -i.bak 's/ADD_LIBRARY(zip SHARED/ADD_LIBRARY(zip STATIC/' CMakeLists.txt 2>/dev/null || true
+        sed -i.bak 's/add_library(zip SHARED/add_library(zip STATIC/' CMakeLists.txt 2>/dev/null || true
+        cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+            -DCMAKE_INSTALL_LIBDIR=lib $CMAKE_LIBZIP_EXTRA $CMAKE_GLOBAL_EXTRA_FLAGS \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF \
+            -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
+            -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$DIR/install.log" 2>&1
+        write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+    else write_caching; cd "$d"; fi
+    write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+    write_done
 }
 
 function build_sqlite3 {
