@@ -596,14 +596,17 @@ function get_github_extension {
 cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
-if [[ "$EXT_PTHREADS_VERSION" == "3.2.1dev" ]]; then
-	echo -n "  pthreads: downloading 3.2.0 (krakjoe/pthreads)..."
-	get_github_extension "pthreads" "3.2.0" "krakjoe" "pthreads" "v"
-	THREAD_EXT_FLAGS="--enable-pthreads"
-else
-	get_github_extension "pthreads" "$EXT_PTHREADS_VERSION" "krakjoe" "pthreads" "v"
-	THREAD_EXT_FLAGS="--enable-pthreads"
-fi
+case "$PHP_VERSION" in
+	7.3.*|7.4.*)
+		echo -n "  pthreads: downloading 4.0.0 (pmmp/ext-pmmpthread)..."
+		get_github_extension "pthreads" "4.0.0" "pmmp" "ext-pmmpthread"
+		THREAD_EXT_FLAGS="--enable-pthreads"
+		;;
+	*)
+		get_github_extension "pthreads" "$EXT_PTHREADS_VERSION" "krakjoe" "pthreads" "v"
+		THREAD_EXT_FLAGS="--enable-pthreads"
+		;;
+esac
 
 if [ -n "$EXT_CHUNKUTILS_VERSION" ]; then
 	get_github_extension "chunkutils2" "$EXT_CHUNKUTILS_VERSION" "pmmp" "ext-chunkutils2"
