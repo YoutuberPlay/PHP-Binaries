@@ -633,7 +633,7 @@ if [ -n "$EXT_DS_VERSION" ]; then
 	get_github_extension "ds" "$EXT_DS_VERSION" "php-ds" "ext-ds" "v"
 fi
 if [ -n "$EXT_WEAKREF_VERSION" ]; then
-	get_extension_tar_gz "weakref" "$EXT_WEAKREF_VERSION" \
+	get_extension_tar_gz "Weakref" "$EXT_WEAKREF_VERSION" \
 		"https://pecl.php.net/get/Weakref-$EXT_WEAKREF_VERSION.tgz" \
 		"weakref-$EXT_WEAKREF_VERSION"
 fi
