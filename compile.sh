@@ -725,6 +725,10 @@ EXTRA_EXT_FLAGS=""
 [ -n "$EXT_DS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-ds"
 [ -n "$EXT_WEAKREF_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-weakref"
 
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+    mv "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" "$INSTALL_DIR/lib/pkgconfig/libcurl.pc.bak" 2>/dev/null || true
+    mv "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc.bak" 2>/dev/null || true
+fi
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
@@ -758,6 +762,11 @@ $EXTRA_EXT_FLAGS \
 $HAVE_VALGRIND \
 $PCNTL_EXTRA \
 $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+    mv "$INSTALL_DIR/lib/pkgconfig/libcurl.pc.bak" "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" 2>/dev/null || true
+    mv "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc.bak" "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" 2>/dev/null || true
+fi
 
 write_compile
 if [ "$COMPILE_FOR_ANDROID" == "yes" ]; then
