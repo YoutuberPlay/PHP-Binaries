@@ -28,13 +28,13 @@ EXT_DS_VERSION=""
 EXT_WEAKREF_VERSION=""
 
 # ---- 7.0 (reference: 7.0.23) ----
-OPENSSL_VERSION_70="1.1.1w"           # 1.1.1 ok for PHP 7.0.28+; using 1.1.0 tag isn't reliably downloadable
-CURL_VERSION_70="curl-7_71_1"         # 7.65.x fails cross-compile
+OPENSSL_VERSION_70="1.1.1w"
+CURL_VERSION_70="curl-7_71_1"
 YAML_VERSION_70="0.2.2"
 GMP_VERSION_70="6.1.2"
 LIBPNG_VERSION_70="1.6.37"
 LIBJPEG_VERSION_70="9c"
-SQLITE3_VERSION_70="3140200"          # 3.14.2
+SQLITE3_VERSION_70="3140200"
 LIBZIP_VERSION_70="1.1.2"
 EXT_PTHREADS_VERSION_70="3.1.6"
 EXT_YAML_VERSION_70="2.0.2"
@@ -54,11 +54,11 @@ YAML_VERSION_72="0.2.4"
 GMP_VERSION_72="6.1.2"
 LIBPNG_VERSION_72="1.6.37"
 LIBJPEG_VERSION_72="9c"
-SQLITE3_VERSION_72="3200100"          # 3.20.1
+SQLITE3_VERSION_72="3200100"
 LIBZIP_VERSION_72="1.1.2"
 EXT_PTHREADS_VERSION_72="3.2.1dev"
 EXT_YAML_VERSION_72="2.0.4"
-EXT_LEVELDB_VERSION_72="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"  # ext 0.2.1 / lib 1.20
+EXT_LEVELDB_VERSION_72="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
 EXT_CHUNKUTILS_VERSION_72=""
 EXT_XDEBUG_VERSION_72=""
 EXT_IGBINARY_VERSION_72="3.0.1"
@@ -74,7 +74,7 @@ YAML_VERSION_73="0.2.4"
 GMP_VERSION_73="6.1.2"
 LIBPNG_VERSION_73="1.6.37"
 LIBJPEG_VERSION_73="9c"
-SQLITE3_VERSION_73="3240000"          # 3.24.0
+SQLITE3_VERSION_73="3240000"
 LIBZIP_VERSION_73="1.5.2"
 EXT_PTHREADS_VERSION_73="3.2.1dev"
 EXT_YAML_VERSION_73="2.0.4"
@@ -94,7 +94,7 @@ YAML_VERSION_74="0.2.5"
 GMP_VERSION_74="6.2.1"
 LIBPNG_VERSION_74="1.6.37"
 LIBJPEG_VERSION_74="9c"
-SQLITE3_VERSION_74="3360000"          # 3.36.0
+SQLITE3_VERSION_74="3360000"
 LIBZIP_VERSION_74="1.8.0"
 EXT_PTHREADS_VERSION_74="3.2.1dev"
 EXT_YAML_VERSION_74="2.2.1"
@@ -198,7 +198,6 @@ if [ "$PHP_VERSION" == "" ]; then
 	exit 1
 fi
 
-# ---- resolve versions by generation ----
 case "$PHP_VERSION" in
 	7.0.*)
 		OPENSSL_VERSION="$OPENSSL_VERSION_70"; CURL_VERSION="$CURL_VERSION_70"
@@ -380,7 +379,7 @@ function build_gmp {
 	local d="./gmp-$GMP_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://github.com/pmmp/DependencyMirror/releases/download/mirror/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
+		download_file "https://github.com/YoutuberPlay/PHP-Binaries/releases/download/pm3/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
 		write_configure; cd "$d"
 		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA \
 			--disable-posix-threads --enable-static --disable-shared \
@@ -475,7 +474,8 @@ function build_libpng {
 	local d="./libpng-$LIBPNG_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://download.sourceforge.net/libpng/libpng-$LIBPNG_VERSION.tar.gz" "libpng" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://github.com/pnggroup/libpng/archive/refs/tags/v$LIBPNG_VERSION.tar.gz" "libpng" | tar -zx >> "$DIR/install.log" 2>&1
+		if [ ! -d "$d" ]; then mv "libpng-$LIBPNG_VERSION"* "$d" 2>/dev/null || true; fi
 		write_configure; cd "$d"
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" \
 			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
@@ -527,7 +527,6 @@ function build_sqlite3 {
 	local d="./sqlite3-$SQLITE3_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		# sqlite 3.14 / 3.20 / 3.24 / 3.36 all live in different year folders
 		local YEAR=""
 		case "$SQLITE3_VERSION" in
 			314*) YEAR=2016 ;;
