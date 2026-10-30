@@ -723,7 +723,7 @@ EXTRA_EXT_FLAGS=""
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
---with-curl="$INSTALL_DIR" \
+--with-curl=$(if [[ "$PHP_VERSION" == 7.4.* ]]; then echo "$INSTALL_DIR/bin/curl-config"; else echo "$INSTALL_DIR"; fi) \
 --with-zlib="$INSTALL_DIR" --with-zlib-dir="$INSTALL_DIR" \
 --with-gmp="$INSTALL_DIR" \
 --with-yaml="$INSTALL_DIR" \
