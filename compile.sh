@@ -598,8 +598,8 @@ write_out "PHP" "Downloading additional extensions..."
 
 case "$PHP_VERSION" in
 	7.3.*)
-		echo -n "  pthreads: downloading 3.2.0 (pmmp/ext-pmmpthread)..."
-		get_github_extension "pthreads" "3.2.0" "pmmp" "ext-pmmpthread"
+		echo -n "  pthreads: downloading krakjoe-final (pmmp/ext-pmmpthread)..."
+		get_github_extension "pthreads" "krakjoe-final" "pmmp" "ext-pmmpthread"
 		THREAD_EXT_FLAGS="--enable-pthreads"
 		;;
 	7.4.*)
