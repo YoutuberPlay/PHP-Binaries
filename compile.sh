@@ -582,10 +582,12 @@ build_sqlite3
 
 # ----- extensions -----
 function get_extension_tar_gz {
-	echo -n "  $1: downloading $2..."
-	download_file "$3" "php-ext-$1" | tar -zx >> "$DIR/install.log" 2>&1
-	mv "$4" "$BUILD_DIR/php/ext/$1"
-	write_done
+    echo -n "  $1: downloading $2..."
+    download_file "$3" "php-ext-$1" | tar -zx >> "$DIR/install.log" 2>&1
+    mv "$4" "$BUILD_DIR/php/ext/$1" 2>/dev/null \
+        || mv "${4,,}" "$BUILD_DIR/php/ext/$1" 2>/dev/null \
+        || { write_error "ext $1: archive extracted to unexpected dir (expected $4)"; return 1; }
+    write_done
 }
 function get_github_extension {
 	get_extension_tar_gz "$1" "$2" "https://github.com/$3/$4/archive/$5$2.tar.gz" "$4-$2"
@@ -640,7 +642,7 @@ fi
 
 write_library "PHP" "$PHP_VERSION"
 write_configure
-cd php
+cd "$BUILD_DIR/php"
 rm -f ./aclocal.m4 >> "$DIR/install.log" 2>&1
 rm -rf ./autom4te.cache/ >> "$DIR/install.log" 2>&1
 rm -f ./configure >> "$DIR/install.log" 2>&1
