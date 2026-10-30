@@ -35,7 +35,7 @@ GMP_VERSION_70="6.1.2"
 LIBPNG_VERSION_70="1.6.37"
 LIBJPEG_VERSION_70="9c"
 SQLITE3_VERSION_70="3140200"
-LIBZIP_VERSION_70="1.1.2"
+LIBZIP_VERSION_70="1.8.0"
 EXT_PTHREADS_VERSION_70="3.1.6"
 EXT_YAML_VERSION_70="2.0.2"
 EXT_LEVELDB_VERSION_70=""
@@ -55,7 +55,7 @@ GMP_VERSION_72="6.1.2"
 LIBPNG_VERSION_72="1.6.37"
 LIBJPEG_VERSION_72="9c"
 SQLITE3_VERSION_72="3200100"
-LIBZIP_VERSION_72="1.1.2"
+LIBZIP_VERSION_72="1.8.0"
 EXT_PTHREADS_VERSION_72="3.2.1dev"
 EXT_YAML_VERSION_72="2.0.4"
 EXT_LEVELDB_VERSION_72="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
@@ -75,7 +75,7 @@ GMP_VERSION_73="6.1.2"
 LIBPNG_VERSION_73="1.6.37"
 LIBJPEG_VERSION_73="9c"
 SQLITE3_VERSION_73="3240000"
-LIBZIP_VERSION_73="1.5.2"
+LIBZIP_VERSION_73="1.8.0"
 EXT_PTHREADS_VERSION_73="3.2.1dev"
 EXT_YAML_VERSION_73="2.0.4"
 EXT_LEVELDB_VERSION_73="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
@@ -503,19 +503,16 @@ function build_libjpeg {
 }
 
 function build_libzip {
-    [ "$DO_STATIC" == "yes" ] && local CMAKE_LIBZIP_EXTRA="-DBUILD_SHARED_LIBS=OFF" || local CMAKE_LIBZIP_EXTRA=""
     write_library libzip "$LIBZIP_VERSION"
     local d="./libzip-$LIBZIP_VERSION"
     if cant_use_cache "$d"; then
         rm -rf "$d"; write_download
         download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
         write_configure; cd "$d"
-        # Принудительно меняем SHARED на STATIC в CMakeLists.txt
-        sed -i.bak 's/ADD_LIBRARY(zip SHARED/ADD_LIBRARY(zip STATIC/' CMakeLists.txt 2>/dev/null || true
-        sed -i.bak 's/add_library(zip SHARED/add_library(zip STATIC/' CMakeLists.txt 2>/dev/null || true
         cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-            -DCMAKE_INSTALL_LIBDIR=lib $CMAKE_LIBZIP_EXTRA $CMAKE_GLOBAL_EXTRA_FLAGS \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_LIBDIR=lib \
+            -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON \
+            $CMAKE_GLOBAL_EXTRA_FLAGS \
             -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF \
             -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
             -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$DIR/install.log" 2>&1
