@@ -341,6 +341,13 @@ export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+    export CURL_CFLAGS="-I$INSTALL_DIR/include"
+    export CURL_LIBS="-L$INSTALL_DIR/lib -lcurl -lssl -lcrypto -lz"
+    export SQLITE_CFLAGS="-I$INSTALL_DIR/include"
+    export SQLITE_LIBS="-L$INSTALL_DIR/lib -lsqlite3"
+fi
+
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$DIR/install.log" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$DIR/install.log" 2>&1
 cd "$BUILD_DIR"
@@ -721,7 +728,7 @@ EXTRA_EXT_FLAGS=""
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
---with-curl=$(if [[ "$PHP_VERSION" == 7.4.* ]]; then echo "$INSTALL_DIR/bin/curl-config"; else echo "$INSTALL_DIR"; fi) \
+$(if [[ "$PHP_VERSION" == 7.4.* ]]; then echo "--with-curl"; else echo "--with-curl=$INSTALL_DIR"; fi) \
 --with-zlib="$INSTALL_DIR" --with-zlib-dir="$INSTALL_DIR" \
 --with-gmp="$INSTALL_DIR" \
 --with-yaml="$INSTALL_DIR" \
