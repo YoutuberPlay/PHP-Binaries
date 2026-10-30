@@ -79,7 +79,7 @@ LIBZIP_VERSION_73="1.8.0"
 EXT_PTHREADS_VERSION_73="3.2.1dev"
 EXT_YAML_VERSION_73="2.0.4"
 EXT_LEVELDB_VERSION_73="1c7564468b41610da4f498430e795ca4de0931ff"
-EXT_CHUNKUTILS_VERSION_73="0.2.0"
+EXT_CHUNKUTILS_VERSION_73="0.3.5"
 EXT_XDEBUG_VERSION_73=""
 EXT_IGBINARY_VERSION_73="3.0.1"
 EXT_CRYPTO_VERSION_73="0.3.1"
@@ -597,9 +597,16 @@ cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
 if [[ "$EXT_PTHREADS_VERSION" == "3.2.1dev" ]]; then
-	echo -n "  pthreads: downloading $EXT_PTHREADS_VERSION (krakjoe v3)..."
-	git clone --depth 1 --branch v3 https://github.com/krakjoe/pthreads.git "$BUILD_DIR/php/ext/pthreads" >> "$DIR/install.log" 2>&1
-	write_done
+	case "$PHP_VERSION" in
+		7.4.*)
+			echo -n "  pthreads: downloading 4.0.0 (pmmp/ext-pmmpthread)..."
+			get_github_extension "pthreads" "4.0.0" "pmmp" "ext-pmmpthread"
+			;;
+		*)
+			echo -n "  pthreads: downloading 3.2.0 (pmmp/ext-pmmpthread)..."
+			get_github_extension "pthreads" "3.2.0" "pmmp" "ext-pmmpthread"
+			;;
+	esac
 	THREAD_EXT_FLAGS="--enable-pthreads"
 else
 	get_github_extension "pthreads" "$EXT_PTHREADS_VERSION" "krakjoe" "pthreads" "v"
@@ -607,7 +614,7 @@ else
 fi
 
 if [ -n "$EXT_CHUNKUTILS_VERSION" ]; then
-	get_github_extension "chunkutils" "$EXT_CHUNKUTILS_VERSION" "pmmp" "ext-chunkutils"
+	get_github_extension "chunkutils2" "$EXT_CHUNKUTILS_VERSION" "pmmp" "ext-chunkutils2"
 fi
 
 if [ -n "$EXT_YAML_VERSION" ]; then
@@ -629,7 +636,7 @@ if [ -n "$EXT_CRYPTO_VERSION" ]; then
 	write_done
 fi
 if [ -n "$EXT_LEVELDB_VERSION" ]; then
-	get_github_extension "leveldb" "$EXT_LEVELDB_VERSION" "pmmp" "php-leveldb"
+	get_github_extension "leveldb" "88071eb1b1eae96af043229104b9d813f7cbe40c" "pmmp" "php-leveldb"
 fi
 if [ -n "$EXT_DS_VERSION" ]; then
 	get_github_extension "ds" "$EXT_DS_VERSION" "php-ds" "ext-ds" "v"
@@ -706,7 +713,7 @@ LEVELDB_FLAG=""
 [ -n "$EXT_LEVELDB_VERSION" ] && LEVELDB_FLAG="--with-leveldb=$INSTALL_DIR"
 
 EXTRA_EXT_FLAGS=""
-[ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils"
+[ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils2"
 [ -n "$EXT_IGBINARY_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-igbinary"
 [ -n "$EXT_CRYPTO_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --with-crypto"
 [ -n "$EXT_RECURSIONGUARD_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-recursionguard"
