@@ -450,11 +450,11 @@ function build_yaml {
 }
 
 function build_leveldb {
-	write_library leveldb "$LEVELDB_VERSION"
-	local d="./leveldb-$LEVELDB_VERSION"
+	write_library leveldb "$EXT_LEVELDB_VERSION"
+	local d="./leveldb-$EXT_LEVELDB_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "pmmp/leveldb" "$LEVELDB_VERSION" "leveldb" | tar -zx >> "$DIR/install.log" 2>&1
+		download_github_src "pmmp/leveldb" "$EXT_LEVELDB_VERSION" "leveldb" | tar -zx >> "$DIR/install.log" 2>&1
 		write_configure; cd "$d"
 		[ "$DO_STATIC" != "yes" ] && local EXTRA="-DBUILD_SHARED_LIBS=ON" || local EXTRA=""
 		cmake . -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
