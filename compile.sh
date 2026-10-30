@@ -508,7 +508,7 @@ function build_libzip {
 	local d="./libzip-$LIBZIP_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "nih-at/libzip" "v$LIBZIP_VERSION" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
 		write_configure; cd "$d"
 		cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
 			-DCMAKE_INSTALL_LIBDIR=lib $CMAKE_LIBZIP_EXTRA $CMAKE_GLOBAL_EXTRA_FLAGS \
