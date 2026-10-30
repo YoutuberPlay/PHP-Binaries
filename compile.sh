@@ -569,7 +569,7 @@ build_yaml
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
 	build_libjpeg
-	HAS_GD="--enable-gd --with-gd"
+	HAS_GD="--with-gd"
 	HAS_LIBJPEG="--with-jpeg-dir=$INSTALL_DIR"
 	HAS_LIBPNG="--with-png-dir=$INSTALL_DIR"
 else
@@ -679,15 +679,12 @@ fi
 
 ZIP_FLAG=""
 case "$PHP_VERSION" in
-	7.2.*|7.3.*) ZIP_FLAG="--with-libzip=$INSTALL_DIR" ;;
-	7.0.*|7.4.*) ZIP_FLAG="--enable-zip" ;;
+	7.0.*) ZIP_FLAG="--enable-zip" ;;
+	7.2.*|7.3.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
+	7.4.*) ZIP_FLAG="--with-zip" ;;
 esac
 
-SQLITE_FLAG=""
-case "$PHP_VERSION" in
-	7.0.*) SQLITE_FLAG="" ;;
-	*) SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR" ;;
-esac
+SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
 
 XML_FLAGS="--disable-libxml --disable-xml --disable-dom --disable-simplexml --disable-xmlreader --disable-xmlwriter"
 
@@ -699,11 +696,14 @@ esac
 
 EMBEDDED_MYSQLI=""
 case "$PHP_VERSION" in
-	7.0.*|7.2.*|7.3.*) EMBEDDED_MYSQLI="--enable-embedded-mysqli" ;;
+	7.0.*) EMBEDDED_MYSQLI="--enable-embedded-mysqli" ;;
 esac
 
 PCNTL_EXTRA=""
 [[ "$PHP_VERSION" == 7.0.* ]] && PCNTL_EXTRA="--enable-weakref"
+
+LEVELDB_FLAG=""
+[ -n "$EXT_LEVELDB_VERSION" ] && LEVELDB_FLAG="--with-leveldb=$INSTALL_DIR"
 
 EXTRA_EXT_FLAGS=""
 [ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils"
@@ -724,7 +724,7 @@ RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" ./config
 $ZIP_FLAG \
 $SQLITE_FLAG \
 $HAS_LIBPNG $HAS_LIBJPEG $HAS_GD \
---with-leveldb="$INSTALL_DIR" \
+$LEVELDB_FLAG \
 --without-readline --without-ncurses \
 $HAS_DEBUG \
 --enable-mbstring --enable-calendar \
