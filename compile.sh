@@ -341,15 +341,6 @@ export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 
-if [[ "$PHP_VERSION" == 7.4.* ]]; then
-    export CURL_CFLAGS="-I$INSTALL_DIR/include"
-    export CURL_LIBS="-L$INSTALL_DIR/lib -lcurl -lssl -lcrypto -lz"
-    export SQLITE_CFLAGS="-I$INSTALL_DIR/include"
-    export SQLITE_LIBS="-L$INSTALL_DIR/lib -lsqlite3"
-    # Изолируем pkg-config от системных путей — иначе найдёт системный libcurl (x86_64)
-    export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
-fi
-
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$DIR/install.log" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$DIR/install.log" 2>&1
 cd "$BUILD_DIR"
@@ -726,6 +717,64 @@ EXTRA_EXT_FLAGS=""
 [ -n "$EXT_RECURSIONGUARD_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-recursionguard"
 [ -n "$EXT_DS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-ds"
 [ -n "$EXT_WEAKREF_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-weakref"
+
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+    cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libcurl
+URL: https://curl.se/
+Description: Library to transfer files with ftp, http, etc.
+Version: 7.71.1
+Libs: -L\${libdir} -lcurl
+Libs.private: -L\${libdir} -lssl -lcrypto -lz
+Cflags: -I\${includedir}
+EOF
+    cat > "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: SQLite
+Description: SQL database engine
+Version: 3.36.0
+Libs: -L\${libdir} -lsqlite3
+Libs.private: -L\${libdir} -lpthread -ldl
+Cflags: -I\${includedir}
+EOF
+fiif [[ "$PHP_VERSION" == 7.4.* ]]; then
+    cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libcurl
+URL: https://curl.se/
+Description: Library to transfer files with ftp, http, etc.
+Version: 7.71.1
+Libs: -L\${libdir} -lcurl
+Libs.private: -L\${libdir} -lssl -lcrypto -lz
+Cflags: -I\${includedir}
+EOF
+    cat > "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: SQLite
+Description: SQL database engine
+Version: 3.36.0
+Libs: -L\${libdir} -lsqlite3
+Libs.private: -L\${libdir} -lpthread -ldl
+Cflags: -I\${includedir}
+EOF
+fi
 
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
