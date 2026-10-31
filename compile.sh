@@ -4,6 +4,7 @@ PHP_VERSION_BASE="auto"
 
 # ---- shared base ----
 ZLIB_VERSION="1.3"
+LIBXML_VERSION="2.10.1" # Добавлено для PHP 7.4
 LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f"
 
 OPENSSL_VERSION=""
@@ -14,7 +15,6 @@ LIBPNG_VERSION=""
 LIBJPEG_VERSION=""
 SQLITE3_VERSION=""
 LIBZIP_VERSION=""
-LIBXML_VERSION=""
 
 EXT_PTHREADS_VERSION=""
 EXT_YAML_VERSION=""
@@ -142,6 +142,8 @@ if [ $ERRORS -ne 0 ]; then exit 1; fi
 export CC="gcc"
 export CXX="g++"
 export RANLIB=ranlib
+export LIBTOOL=libtool
+export LIBTOOLIZE=libtoolize
 
 COMPILE_FOR_ANDROID=no
 HAVE_MYSQLI="--enable-mysqlnd --with-mysqli=mysqlnd"
@@ -272,6 +274,11 @@ function download_file {
 		_download_file "$url" 2>> "$DIR/install.log"
 	fi
 }
+
+function download_from_mirror {
+	download_file "https://github.com/pmmp/DependencyMirror/releases/download/mirror/$1" "$2"
+}
+
 function download_github_src { download_file "https://github.com/$1/archive/$2.tar.gz" "$3"; }
 
 GMP_ABI=""
@@ -340,7 +347,7 @@ export CFLAGS="-O2 -fPIC $CFLAGS"
 export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 
-# === КРИТИЧЕСКИ ВАЖНОЕ ИСПРАВЛЕНИЕ: PKG_CONFIG_LIBDIR ПОЛНОСТЬЮ ЗАМЕНЯЕТ ПУТИ ПОИСКА ===
+# === КРИТИЧЕСКИ ВАЖНО: PKG_CONFIG_LIBDIR полностью заменяет системные пути ===
 export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_CROSS=1
@@ -453,6 +460,47 @@ function build_yaml {
 	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
 	write_done
 }
+
+# === ДОБАВЛЕНО: Сборка libxml2 для удовлетворения требований pkg-config в PHP 7.4 ===
+function build_libxml2 {
+	write_library libxml2 "$LIBXML_VERSION"
+	local libxml2_dir="./libxml2-$LIBXML_VERSION"
+
+	if cant_use_cache "$libxml2_dir"; then
+		rm -rf "$libxml2_dir"
+		write_download
+		download_from_mirror "libxml2-v$LIBXML_VERSION.tar.gz" "libxml2" | tar -xz >> "$DIR/install.log" 2>&1
+		mv libxml2-v$LIBXML_VERSION "$libxml2_dir"
+
+		write_configure
+		cd "$libxml2_dir"
+		if [ "$DO_STATIC" == "yes" ]; then
+			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
+		else
+			local EXTRA_FLAGS="--enable-shared=yes --enable-static=no"
+		fi
+		sed -i.bak 's{libtoolize --version{"$LIBTOOLIZE" --version{' autogen.sh
+		./autogen.sh --prefix="$INSTALL_DIR" \
+			--without-iconv \
+			--without-python \
+			--without-lzma \
+			--with-zlib="$INSTALL_DIR" \
+			--config-cache \
+			$EXTRA_FLAGS \
+			$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+
+		write_compile
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$libxml2_dir"
+	fi
+	write_install
+	make install >> "$DIR/install.log" 2>&1
+	cd ..
+	write_done
+}
+# ================================================================================
 
 function build_leveldb {
 	write_library leveldb "$EXT_LEVELDB_VERSION"
@@ -569,6 +617,7 @@ build_gmp
 build_openssl
 build_curl
 build_yaml
+build_libxml2 # === Вызов сборки libxml2 ===
 
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
@@ -663,7 +712,6 @@ if [ "$DO_STATIC" == "yes" ]; then
 	if [ -z "$PKG_CONFIG" ]; then PKG_CONFIG="$(which pkg-config)" || true; fi
 	if [ ! -z "$PKG_CONFIG" ]; then
 		echo '#!/bin/sh' > "$BUILD_DIR/pkg-config-wrapper"
-		# Переопределяем пути поиска ВНУТРИ враппера, чтобы исключить системные .pc файлы
 		echo 'export PKG_CONFIG_LIBDIR="'"$INSTALL_DIR/lib/pkgconfig"'"' >> "$BUILD_DIR/pkg-config-wrapper"
 		echo 'export PKG_CONFIG_ALLOW_CROSS=1' >> "$BUILD_DIR/pkg-config-wrapper"
 		echo 'export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1' >> "$BUILD_DIR/pkg-config-wrapper"
