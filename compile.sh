@@ -450,7 +450,8 @@ function build_curl {
 			--disable-imap --disable-pop3 --disable-rtsp --disable-smtp \
 			--disable-telnet --disable-tftp --disable-ldap --disable-ldaps \
 			--without-libidn --without-libidn2 --without-brotli --without-nghttp2 \
-			--without-zstd --with-zlib="$INSTALL_DIR" --with-ssl="$INSTALL_DIR" \
+			--without-zstd --without-libpsl \
+			--with-zlib="$INSTALL_DIR" --with-ssl="$INSTALL_DIR" \
 			--enable-threaded-resolver --prefix="$INSTALL_DIR" \
 			$EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
 		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
