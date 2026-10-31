@@ -746,40 +746,15 @@ Libs: -L\${libdir} -lsqlite3
 Libs.private: -L\${libdir} -lpthread -ldl
 Cflags: -I\${includedir}
 EOF
-fiif [[ "$PHP_VERSION" == 7.4.* ]]; then
-    cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
-prefix=$INSTALL_DIR
-exec_prefix=\${prefix}
-libdir=\${prefix}/lib
-includedir=\${prefix}/include
-
-Name: libcurl
-URL: https://curl.se/
-Description: Library to transfer files with ftp, http, etc.
-Version: 7.71.1
-Libs: -L\${libdir} -lcurl
-Libs.private: -L\${libdir} -lssl -lcrypto -lz
-Cflags: -I\${includedir}
-EOF
-    cat > "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" <<EOF
-prefix=$INSTALL_DIR
-exec_prefix=\${prefix}
-libdir=\${prefix}/lib
-includedir=\${prefix}/include
-
-Name: SQLite
-Description: SQL database engine
-Version: 3.36.0
-Libs: -L\${libdir} -lsqlite3
-Libs.private: -L\${libdir} -lpthread -ldl
-Cflags: -I\${includedir}
-EOF
 fi
+
+CURL_ARG="--with-curl=$INSTALL_DIR"
+[[ "$PHP_VERSION" == 7.4.* ]] && CURL_ARG="--with-curl"
 
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
-$(if [[ "$PHP_VERSION" == 7.4.* ]]; then echo "--with-curl"; else echo "--with-curl=$INSTALL_DIR"; fi) \
+$CURL_ARG \
 --with-zlib="$INSTALL_DIR" --with-zlib-dir="$INSTALL_DIR" \
 --with-gmp="$INSTALL_DIR" \
 --with-yaml="$INSTALL_DIR" \
