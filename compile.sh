@@ -4,7 +4,8 @@ PHP_VERSION_BASE="auto"
 
 # ---- shared base ----
 ZLIB_VERSION="1.3"
-LIBXML_VERSION="2.10.1" # Добавлено для PHP 7.4
+LIBXML_VERSION="2.10.1"
+ONIGURUMA_VERSION="6.9.7.1" # Добавлено для PHP 7.4+
 LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f"
 
 OPENSSL_VERSION=""
@@ -461,7 +462,6 @@ function build_yaml {
 	write_done
 }
 
-# === ДОБАВЛЕНО: Сборка libxml2 для удовлетворения требований pkg-config в PHP 7.4 ===
 function build_libxml2 {
 	write_library libxml2 "$LIBXML_VERSION"
 	local libxml2_dir="./libxml2-$LIBXML_VERSION"
@@ -494,6 +494,40 @@ function build_libxml2 {
 	else
 		write_caching
 		cd "$libxml2_dir"
+	fi
+	write_install
+	make install >> "$DIR/install.log" 2>&1
+	cd ..
+	write_done
+}
+
+# === ДОБАВЛЕНО: Сборка oniguruma для PHP 7.4+ ===
+function build_oniguruma {
+	write_library oniguruma "$ONIGURUMA_VERSION"
+	local onig_dir="./oniguruma-$ONIGURUMA_VERSION"
+
+	if cant_use_cache "$onig_dir"; then
+		rm -rf "$onig_dir"
+		write_download
+		download_github_src "kkos/oniguruma" "v$ONIGURUMA_VERSION" "oniguruma" | tar -zx >> "$DIR/install.log" 2>&1
+		mv oniguruma-v$ONIGURUMA_VERSION "$onig_dir" 2>/dev/null || mv oniguruma-$ONIGURUMA_VERSION "$onig_dir"
+
+		write_configure
+		cd "$onig_dir"
+		if [ "$DO_STATIC" == "yes" ]; then
+			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
+		else
+			local EXTRA_FLAGS="--enable-shared=yes --enable-static=no"
+		fi
+		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
+			$EXTRA_FLAGS \
+			$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+
+		write_compile
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$onig_dir"
 	fi
 	write_install
 	make install >> "$DIR/install.log" 2>&1
@@ -617,7 +651,8 @@ build_gmp
 build_openssl
 build_curl
 build_yaml
-build_libxml2 # === Вызов сборки libxml2 ===
+build_libxml2
+build_oniguruma # === Вызов сборки oniguruma ===
 
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
@@ -821,6 +856,7 @@ $LEVELDB_FLAG \
 --without-readline --without-ncurses \
 $HAS_DEBUG \
 --enable-mbstring --enable-calendar \
+--with-onig="$INSTALL_DIR" \
 $THREAD_EXT_FLAGS \
 --disable-fileinfo \
 $XML_FLAGS \
