@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 
-# ==============================================================================
-# ---- Build Configuration (Настройки сборки) ----
-# ==============================================================================
-ENABLE_DEBUG_LOG="no"        # "yes" = писать подробный install.log, "no" = тихий режим
-CREATE_TARXZ_ARTIFACT="no"   # "yes" = создать готовый .tar.xz архив в конце
-# ==============================================================================
+# 1 = писать install.log, 0 = тихий режим (вывод в /dev/null)
+ENABLE_DEBUG_LOG=0
 
 PHP_VERSIONS=("7.0.33" "7.2.34" "7.3.33" "7.4.33")
 PHP_VERSION_BASE="auto"
@@ -136,8 +132,7 @@ BUILD_DIR="$BASE_BUILD_DIR/subdir"
 LIB_BUILD_DIR="$BUILD_DIR/lib"
 INSTALL_DIR="$DIR/bin/php7"
 
-# Настройка логирования
-if [ "$ENABLE_DEBUG_LOG" == "yes" ]; then
+if [ "$ENABLE_DEBUG_LOG" -eq 1 ]; then
     LOG_FILE="$DIR/install.log"
     date > "$LOG_FILE" 2>&1
     uname -a >> "$LOG_FILE" 2>&1
@@ -362,13 +357,11 @@ export CFLAGS="-O2 -fPIC $CFLAGS"
 export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 
-# === КРИТИЧЕСКИ ВАЖНО: PKG_CONFIG_LIBDIR полностью заменяет системные пути ===
 export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
 export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
-# =======================================================================================
 
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$LOG_FILE" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
@@ -381,7 +374,6 @@ download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$LOG_FI
 mv php-src-php-$PHP_VERSION php >> "$LOG_FILE" 2>&1
 write_done
 
-# ----- library builds -----
 function build_zlib {
 	[ "$DO_STATIC" == "yes" ] && local EXTRA="--static" || local EXTRA="--shared"
 	write_library zlib "$ZLIB_VERSION"
@@ -682,7 +674,6 @@ if [ -n "$EXT_LEVELDB_VERSION" ]; then build_leveldb; fi
 build_libzip
 build_sqlite3
 
-# ----- extensions -----
 function get_extension_tar_gz {
     echo -n "  $1: downloading $2..."
     download_file "$3" "php-ext-$1" | tar -zx >> "$LOG_FILE" 2>&1
@@ -927,16 +918,8 @@ TIMEZONE=$(date +%Z)
 } >> "$INSTALL_DIR/bin/php.ini"
 write_done
 
-# ==============================================================================
-# ---- Artifact Creation (Создание финального архива) ----
-# ==============================================================================
-if [ "$CREATE_TARXZ_ARTIFACT" == "yes" ]; then
-    write_out "INFO" "Creating optimized .tar.xz artifact..."
-    ARCHIVE_NAME="php-$PHP_VERSION-android-aarch64.tar.xz"
-    tar -cJf "$DIR/$ARCHIVE_NAME" -C "$DIR" "bin/php7" >> "$LOG_FILE" 2>&1
-    write_out "INFO" "Artifact successfully created: $DIR/$ARCHIVE_NAME"
-fi
-# ==============================================================================
+ARCHIVE_NAME="php-$PHP_VERSION-android-aarch64.tar.xz"
+tar -cJf "$DIR/$ARCHIVE_NAME" -C "$DIR" "bin/php7" >> "$LOG_FILE" 2>&1
 
 cd "$DIR"
 if [ "$DO_CLEANUP" == "yes" ]; then
@@ -949,7 +932,7 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -f "$INSTALL_DIR/lib/"*.a "$INSTALL_DIR/lib/"*.la
 fi
 
-if [ "$ENABLE_DEBUG_LOG" == "yes" ]; then
+if [ "$ENABLE_DEBUG_LOG" -eq 1 ]; then
     date >> "$LOG_FILE" 2>&1
 fi
 
