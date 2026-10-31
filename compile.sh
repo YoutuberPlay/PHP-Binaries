@@ -98,7 +98,7 @@ EXT_WEAKREF_VERSION_73=""
 
 # ---- 7.4 (CORRECTED versions for PHP 7.4 compatibility) ----
 OPENSSL_VERSION_74="1.1.1w"
-CURL_VERSION_74="curl-7_78_0" # <--- ИСПРАВЛЕНО: Версия curl как в старом билде
+CURL_VERSION_74="curl-7_71_1"
 YAML_VERSION_74="0.2.5"
 GMP_VERSION_74="6.2.1"
 LIBPNG_VERSION_74="1.6.37"
@@ -450,8 +450,7 @@ function build_curl {
 			--disable-imap --disable-pop3 --disable-rtsp --disable-smtp \
 			--disable-telnet --disable-tftp --disable-ldap --disable-ldaps \
 			--without-libidn --without-libidn2 --without-brotli --without-nghttp2 \
-			--without-zstd --without-libpsl \
-			--with-zlib="$INSTALL_DIR" --with-ssl="$INSTALL_DIR" \
+			--without-zstd --with-zlib="$INSTALL_DIR" --with-ssl="$INSTALL_DIR" \
 			--enable-threaded-resolver --prefix="$INSTALL_DIR" \
 			$EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
 		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
@@ -782,7 +781,7 @@ includedir=\${prefix}/include
 
 Name: libcurl
 Description: Library to transfer files with ftp, http, etc.
-Version: 7.78.0
+Version: 7.71.1
 Libs: -L\${libdir} -lcurl
 Libs.private: -L\${libdir} -lssl -lcrypto -lz -ldl -lpthread
 Cflags: -I\${includedir}
@@ -829,7 +828,6 @@ esac
 
 SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
 
-# === ИСПРАВЛЕНО: Включаем XML расширения, так как libxml2 успешно собран ===
 XML_FLAGS="--with-libxml --enable-xml --enable-dom --enable-simplexml --enable-xmlreader --enable-xmlwriter"
 
 PDO_FLAGS=""
