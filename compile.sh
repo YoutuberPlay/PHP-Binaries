@@ -87,24 +87,24 @@ EXT_RECURSIONGUARD_VERSION_73="0.1.0"
 EXT_DS_VERSION_73="1.2.9"
 EXT_WEAKREF_VERSION_73=""
 
-# ---- 7.4 (test: same as 7.3) ----
+# ---- 7.4 (CORRECTED versions for PHP 7.4 compatibility) ----
 OPENSSL_VERSION_74="1.1.1w"
 CURL_VERSION_74="curl-7_71_1"
-YAML_VERSION_74="0.2.4"
-GMP_VERSION_74="6.1.2"
+YAML_VERSION_74="0.2.5"
+GMP_VERSION_74="6.2.1"
 LIBPNG_VERSION_74="1.6.37"
 LIBJPEG_VERSION_74="9c"
-SQLITE3_VERSION_74="3240000"
+SQLITE3_VERSION_74="3360000"
 LIBZIP_VERSION_74="1.8.0"
 EXT_PTHREADS_VERSION_74="3.2.0"
-EXT_YAML_VERSION_74="2.0.4"
+EXT_YAML_VERSION_74="2.2.1"
 EXT_LEVELDB_VERSION_74="1c7564468b41610da4f498430e795ca4de0931ff"
-EXT_CHUNKUTILS_VERSION_74="0.3.5"
+EXT_CHUNKUTILS_VERSION_74=""
 EXT_XDEBUG_VERSION_74=""
-EXT_IGBINARY_VERSION_74="3.0.1"
-EXT_CRYPTO_VERSION_74="0.3.1"
+EXT_IGBINARY_VERSION_74="3.2.4"
+EXT_CRYPTO_VERSION_74="0.3.2"
 EXT_RECURSIONGUARD_VERSION_74="0.1.0"
-EXT_DS_VERSION_74="1.2.9"
+EXT_DS_VERSION_74=""
 EXT_WEAKREF_VERSION_74=""
 
 function write_out()   { echo "[$1] $2"; }
@@ -187,7 +187,7 @@ if [ "$PM_VERSION_MAJOR" == "" ]; then
 	exit 1
 fi
 
-if [ "$PHP_VERSION_BASE" == "auto" ]; then PHP_VERSION_BASE="7.3"; fi
+if [ "$PHP_VERSION_BASE" == "auto" ]; then PHP_VERSION_BASE="7.4"; fi
 
 PHP_VERSION=""
 for v in "${PHP_VERSIONS[@]}"; do
@@ -340,6 +340,12 @@ export CFLAGS="-O2 -fPIC $CFLAGS"
 export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
+
+# === КРИТИЧЕСКИ ВАЖНОЕ ИСПРАВЛЕНИЕ ДЛЯ КРОСС-КОМПИЛЯЦИИ ===
+export PKG_CONFIG_ALLOW_CROSS=1
+export PKG_CONFIG_ALLOW_SYSTEM_LIBS="yes"
+export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS="yes"
+# ==========================================================
 
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$DIR/install.log" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$DIR/install.log" 2>&1
@@ -538,7 +544,6 @@ function build_sqlite3 {
 		mv sqlite-autoconf-$SQLITE3_VERSION "$d"
 		write_configure; cd "$d"
 
-		# SQLite explicitly refuses -ffast-math. Use a sanitized CFLAGS for this build only.
 		local SAVED_CFLAGS="$CFLAGS"
 		local SAVED_CXXFLAGS="$CXXFLAGS"
 		export CFLAGS="$(echo "$CFLAGS" | sed -e 's/-ffast-math//g' -e 's/-funsafe-math-optimizations//g' -e 's/-ffinite-math-only//g' -e 's/-fno-rounding-math//g' -e 's/-fno-signaling-nans//g' -e 's/-fno-signed-zeros//g' -e 's/-fno-trapping-math//g' -e 's/-fcx-limited-range//g' -e 's/-fno-math-errno//g' -e 's/  */ /g' | xargs)"
@@ -601,10 +606,11 @@ case "$PHP_VERSION" in
 		THREAD_EXT_FLAGS="--enable-pthreads"
 		;;
 	7.4.*)
-	echo -n "  pthreads: downloading krakjoe-final (pmmp/ext-pmmpthread)..."
-	get_github_extension "pthreads" "krakjoe-final" "pmmp" "ext-pmmpthread"
-	THREAD_EXT_FLAGS="--enable-pthreads"
-	;;
+		# ИСПРАВЛЕНО: Для PHP 7.4 в PocketMine нужен pmmp fork версии 4.0.0
+		echo -n "  pthreads: downloading 4.0.0 (pmmp/ext-pmmpthread)..."
+		get_github_extension "pthreads" "4.0.0" "pmmp" "ext-pmmpthread"
+		THREAD_EXT_FLAGS="--enable-pthreads"
+		;;
 	*)
 		get_github_extension "pthreads" "$EXT_PTHREADS_VERSION" "krakjoe" "pthreads" "v"
 		THREAD_EXT_FLAGS="--enable-pthreads"
@@ -657,10 +663,44 @@ if [ "$DO_STATIC" == "yes" ]; then
 	if [ -z "$PKG_CONFIG" ]; then PKG_CONFIG="$(which pkg-config)" || true; fi
 	if [ ! -z "$PKG_CONFIG" ]; then
 		echo '#!/bin/sh' > "$BUILD_DIR/pkg-config-wrapper"
+		# ИСПРАВЛЕНО: Добавляем переменные окружения внутрь враппера для кросс-компиляции
+		echo 'export PKG_CONFIG_ALLOW_CROSS=1' >> "$BUILD_DIR/pkg-config-wrapper"
+		echo 'export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1' >> "$BUILD_DIR/pkg-config-wrapper"
 		echo 'exec '$PKG_CONFIG' "$@" --static' >> "$BUILD_DIR/pkg-config-wrapper"
 		chmod +x "$BUILD_DIR/pkg-config-wrapper"
 		export PKG_CONFIG="$BUILD_DIR/pkg-config-wrapper"
 	fi
+fi
+
+# Хак для статической кросс-компиляции PHP 7.4: добавляем системные библиотеки в .pc файлы
+if [[ "$PHP_VERSION" == 7.4.* ]] && [[ "$DO_STATIC" == "yes" ]]; then
+    cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libcurl
+URL: https://curl.se/
+Description: Library to transfer files with ftp, http, etc.
+Version: 7.71.1
+Libs: -L\${libdir} -lcurl
+Libs.private: -L\${libdir} -lssl -lcrypto -lz -ldl -lpthread
+Cflags: -I\${includedir}
+EOF
+    cat > "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: SQLite
+Description: SQL database engine
+Version: 3.36.0
+Libs: -L\${libdir} -lsqlite3
+Libs.private: -L\${libdir} -lpthread -ldl
+Cflags: -I\${includedir}
+EOF
 fi
 
 if [ "$IS_CROSSCOMPILE" == "yes" ]; then
@@ -716,10 +756,11 @@ EXTRA_EXT_FLAGS=""
 [ -n "$EXT_DS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-ds"
 [ -n "$EXT_WEAKREF_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-weakref"
 
+# ИСПРАВЛЕНО: используем --with-curl (без пути), чтобы pkg-config нашел libcurl.pc
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
---with-curl="$INSTALL_DIR" \
+--with-curl \
 --with-zlib="$INSTALL_DIR" --with-zlib-dir="$INSTALL_DIR" \
 --with-gmp="$INSTALL_DIR" \
 --with-yaml="$INSTALL_DIR" \
