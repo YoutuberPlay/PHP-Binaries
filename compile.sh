@@ -339,13 +339,14 @@ export CC CXX CFLAGS CXXFLAGS LDFLAGS CPPFLAGS
 export CFLAGS="-O2 -fPIC $CFLAGS"
 export CXXFLAGS="$CFLAGS $CXXFLAGS"
 export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
-export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 
-# === КРИТИЧЕСКИ ВАЖНОЕ ИСПРАВЛЕНИЕ ДЛЯ КРОСС-КОМПИЛЯЦИИ ===
+# === КРИТИЧЕСКИ ВАЖНОЕ ИСПРАВЛЕНИЕ: PKG_CONFIG_LIBDIR ПОЛНОСТЬЮ ЗАМЕНЯЕТ ПУТИ ПОИСКА ===
+export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
+export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_CROSS=1
-export PKG_CONFIG_ALLOW_SYSTEM_LIBS="yes"
-export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS="yes"
-# ==========================================================
+export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
+# =======================================================================================
 
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$DIR/install.log" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$DIR/install.log" 2>&1
@@ -606,7 +607,6 @@ case "$PHP_VERSION" in
 		THREAD_EXT_FLAGS="--enable-pthreads"
 		;;
 	7.4.*)
-		# ИСПРАВЛЕНО: Для PHP 7.4 в PocketMine нужен pmmp fork версии 4.0.0
 		echo -n "  pthreads: downloading 4.0.0 (pmmp/ext-pmmpthread)..."
 		get_github_extension "pthreads" "4.0.0" "pmmp" "ext-pmmpthread"
 		THREAD_EXT_FLAGS="--enable-pthreads"
@@ -663,17 +663,20 @@ if [ "$DO_STATIC" == "yes" ]; then
 	if [ -z "$PKG_CONFIG" ]; then PKG_CONFIG="$(which pkg-config)" || true; fi
 	if [ ! -z "$PKG_CONFIG" ]; then
 		echo '#!/bin/sh' > "$BUILD_DIR/pkg-config-wrapper"
-		# ИСПРАВЛЕНО: Добавляем переменные окружения внутрь враппера для кросс-компиляции
+		# Переопределяем пути поиска ВНУТРИ враппера, чтобы исключить системные .pc файлы
+		echo 'export PKG_CONFIG_LIBDIR="'"$INSTALL_DIR/lib/pkgconfig"'"' >> "$BUILD_DIR/pkg-config-wrapper"
 		echo 'export PKG_CONFIG_ALLOW_CROSS=1' >> "$BUILD_DIR/pkg-config-wrapper"
 		echo 'export PKG_CONFIG_ALLOW_SYSTEM_LIBS=1' >> "$BUILD_DIR/pkg-config-wrapper"
-		echo 'exec '$PKG_CONFIG' "$@" --static' >> "$BUILD_DIR/pkg-config-wrapper"
+		echo 'export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1' >> "$BUILD_DIR/pkg-config-wrapper"
+		echo 'exec '$PKG_CONFIG' --static "$@"' >> "$BUILD_DIR/pkg-config-wrapper"
 		chmod +x "$BUILD_DIR/pkg-config-wrapper"
 		export PKG_CONFIG="$BUILD_DIR/pkg-config-wrapper"
 	fi
 fi
 
-# Хак для статической кросс-компиляции PHP 7.4: добавляем системные библиотеки в .pc файлы
+# Хак для статической кросс-компиляции PHP 7.4: гарантируем наличие системных зависимостей в .pc
 if [[ "$PHP_VERSION" == 7.4.* ]] && [[ "$DO_STATIC" == "yes" ]]; then
+    mkdir -p "$INSTALL_DIR/lib/pkgconfig"
     cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
 prefix=$INSTALL_DIR
 exec_prefix=\${prefix}
@@ -681,7 +684,6 @@ libdir=\${prefix}/lib
 includedir=\${prefix}/include
 
 Name: libcurl
-URL: https://curl.se/
 Description: Library to transfer files with ftp, http, etc.
 Version: 7.71.1
 Libs: -L\${libdir} -lcurl
@@ -756,7 +758,6 @@ EXTRA_EXT_FLAGS=""
 [ -n "$EXT_DS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-ds"
 [ -n "$EXT_WEAKREF_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-weakref"
 
-# ИСПРАВЛЕНО: используем --with-curl (без пути), чтобы pkg-config нашел libcurl.pc
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="-L$INSTALL_DIR/lib $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
