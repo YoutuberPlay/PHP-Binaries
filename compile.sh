@@ -5,7 +5,7 @@ PHP_VERSION_BASE="auto"
 # ---- shared base ----
 ZLIB_VERSION="1.3"
 LIBXML_VERSION="2.10.1"
-ONIGURUMA_VERSION="6.9.7.1" # Добавлено для PHP 7.4+
+ONIGURUMA_VERSION="6.9.7.1"
 LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f"
 
 OPENSSL_VERSION=""
@@ -497,21 +497,22 @@ function build_libxml2 {
 	fi
 	write_install
 	make install >> "$DIR/install.log" 2>&1
-	cd ..
+	cd "$LIB_BUILD_DIR"
 	write_done
 }
 
-# === ДОБАВЛЕНО: Сборка oniguruma для PHP 7.4+ ===
+# === ИСПРАВЛЕНО: Сборка oniguruma с использованием --strip-components для избежания ошибок mv ===
 function build_oniguruma {
 	write_library oniguruma "$ONIGURUMA_VERSION"
 	local onig_dir="./oniguruma-$ONIGURUMA_VERSION"
 
 	if cant_use_cache "$onig_dir"; then
 		rm -rf "$onig_dir"
+		mkdir -p "$onig_dir"
 		write_download
-		download_github_src "kkos/oniguruma" "v$ONIGURUMA_VERSION" "oniguruma" | tar -zx >> "$DIR/install.log" 2>&1
-		mv oniguruma-v$ONIGURUMA_VERSION "$onig_dir" 2>/dev/null || mv oniguruma-$ONIGURUMA_VERSION "$onig_dir"
-
+		# --strip-components=1 удаляет верхнюю папку из архива GitHub, сразу помещая файлы в onig_dir
+		download_github_src "kkos/oniguruma" "v$ONIGURUMA_VERSION" "oniguruma" | tar -zx --strip-components=1 -C "$onig_dir" >> "$DIR/install.log" 2>&1
+		
 		write_configure
 		cd "$onig_dir"
 		if [ "$DO_STATIC" == "yes" ]; then
@@ -531,7 +532,7 @@ function build_oniguruma {
 	fi
 	write_install
 	make install >> "$DIR/install.log" 2>&1
-	cd ..
+	cd "$LIB_BUILD_DIR"
 	write_done
 }
 # ================================================================================
@@ -652,7 +653,7 @@ build_openssl
 build_curl
 build_yaml
 build_libxml2
-build_oniguruma # === Вызов сборки oniguruma ===
+build_oniguruma
 
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
@@ -757,7 +758,6 @@ if [ "$DO_STATIC" == "yes" ]; then
 	fi
 fi
 
-# Хак для статической кросс-компиляции PHP 7.4: гарантируем наличие системных зависимостей в .pc
 if [[ "$PHP_VERSION" == 7.4.* ]] && [[ "$DO_STATIC" == "yes" ]]; then
     mkdir -p "$INSTALL_DIR/lib/pkgconfig"
     cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
