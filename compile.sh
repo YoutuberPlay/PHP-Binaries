@@ -157,7 +157,7 @@ DO_CLEANUP="yes"
 COMPILE_DEBUG="no"
 HAVE_VALGRIND="--without-valgrind"
 HAVE_OPCACHE="no"
-COMPILE_GD="no"
+COMPILE_GD="yes" # === ВОЗВРАЩЕНО: Включаем сборку GD ===
 PM_VERSION_MAJOR=""
 DOWNLOAD_INSECURE="no"
 DOWNLOAD_CACHE=""
@@ -501,7 +501,6 @@ function build_libxml2 {
 	write_done
 }
 
-# === ИСПРАВЛЕНО: Добавлен вызов ./autogen.sh, так как GitHub релизы oniguruma не содержат готового configure ===
 function build_oniguruma {
 	write_library oniguruma "$ONIGURUMA_VERSION"
 	local onig_dir="./oniguruma-$ONIGURUMA_VERSION"
@@ -514,8 +513,6 @@ function build_oniguruma {
 		
 		write_configure
 		cd "$onig_dir"
-		
-		# Генерируем скрипт configure из configure.ac
 		./autogen.sh >> "$DIR/install.log" 2>&1
 		
 		if [ "$DO_STATIC" == "yes" ]; then
@@ -538,7 +535,6 @@ function build_oniguruma {
 	cd "$LIB_BUILD_DIR"
 	write_done
 }
-# ================================================================================
 
 function build_leveldb {
 	write_library leveldb "$EXT_LEVELDB_VERSION"
@@ -818,11 +814,13 @@ esac
 
 SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
 
-XML_FLAGS="--disable-libxml --disable-xml --disable-dom --disable-simplexml --disable-xmlreader --disable-xmlwriter"
+# === ВОЗВРАЩЕНО: Включаем XML расширения, так как libxml2 теперь успешно собирается ===
+XML_FLAGS="--with-libxml --enable-xml --enable-dom --enable-simplexml --enable-xmlreader --enable-xmlwriter"
 
+# === ВОЗВРАЩЕНО: Включаем PDO, как в старой сборке ===
 PDO_FLAGS=""
 case "$PHP_VERSION" in
-	7.0.*|7.2.*|7.3.*|7.4.*) PDO_FLAGS="--disable-pdo --without-pdo-sqlite" ;;
+	7.0.*|7.2.*|7.3.*|7.4.*) PDO_FLAGS="--enable-pdo --with-pdo-sqlite=$INSTALL_DIR --with-pdo-mysql" ;;
 esac
 
 EMBEDDED_MYSQLI=""
@@ -858,7 +856,7 @@ $HAS_LIBPNG $HAS_LIBJPEG $HAS_GD \
 $LEVELDB_FLAG \
 --without-readline --without-ncurses \
 $HAS_DEBUG \
---enable-mbstring --enable-calendar \
+--enable-mbstring --disable-mbregex --enable-calendar \
 --with-onig="$INSTALL_DIR" \
 $THREAD_EXT_FLAGS \
 --disable-fileinfo \
