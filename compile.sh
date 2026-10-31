@@ -501,7 +501,7 @@ function build_libxml2 {
 	write_done
 }
 
-# === ИСПРАВЛЕНО: Сборка oniguruma с использованием --strip-components для избежания ошибок mv ===
+# === ИСПРАВЛЕНО: Добавлен вызов ./autogen.sh, так как GitHub релизы oniguruma не содержат готового configure ===
 function build_oniguruma {
 	write_library oniguruma "$ONIGURUMA_VERSION"
 	local onig_dir="./oniguruma-$ONIGURUMA_VERSION"
@@ -510,11 +510,14 @@ function build_oniguruma {
 		rm -rf "$onig_dir"
 		mkdir -p "$onig_dir"
 		write_download
-		# --strip-components=1 удаляет верхнюю папку из архива GitHub, сразу помещая файлы в onig_dir
 		download_github_src "kkos/oniguruma" "v$ONIGURUMA_VERSION" "oniguruma" | tar -zx --strip-components=1 -C "$onig_dir" >> "$DIR/install.log" 2>&1
 		
 		write_configure
 		cd "$onig_dir"
+		
+		# Генерируем скрипт configure из configure.ac
+		./autogen.sh >> "$DIR/install.log" 2>&1
+		
 		if [ "$DO_STATIC" == "yes" ]; then
 			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
 		else
