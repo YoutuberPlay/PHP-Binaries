@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# 1 = писать install.log, 0 = тихий режим (вывод в /dev/null)
+ENABLE_DEBUG_LOG=0
+
 PHP_VERSIONS=("7.0.33" "7.2.34" "7.3.33" "7.4.33")
 PHP_VERSION_BASE="auto"
 
@@ -14,7 +18,8 @@ LIBPNG_VERSION=""
 LIBJPEG_VERSION=""
 SQLITE3_VERSION=""
 LIBZIP_VERSION=""
-LIBXML_VERSION=""
+LIBXML_VERSION="2.10.1"
+ONIGURUMA_VERSION="6.9.7.1"
 
 EXT_PTHREADS_VERSION=""
 EXT_YAML_VERSION=""
@@ -127,21 +132,28 @@ BUILD_DIR="$BASE_BUILD_DIR/subdir"
 LIB_BUILD_DIR="$BUILD_DIR/lib"
 INSTALL_DIR="$DIR/bin/php7"
 
-date > "$DIR/install.log" 2>&1
-uname -a >> "$DIR/install.log" 2>&1
+if [ "$ENABLE_DEBUG_LOG" -eq 1 ]; then
+	LOG_FILE="$DIR/install.log"
+	date > "$LOG_FILE" 2>&1
+	uname -a >> "$LOG_FILE" 2>&1
+else
+	LOG_FILE="/dev/null"
+fi
 
 write_out "INFO" "Checking dependencies"
 DEPS=( make autoconf automake m4 getconf gzip bzip2 bison g++ git cmake pkg-config re2c libtool )
 ERRORS=0
 for d in "${DEPS[@]}"; do
-	type "$d" >> "$DIR/install.log" 2>&1 || { write_error "Please install \"$d\""; ((ERRORS++)); }
+	type "$d" >> "$LOG_FILE" 2>&1 || { write_error "Please install \"$d\""; ((ERRORS++)); }
 done
-type wget >> "$DIR/install.log" 2>&1 || type curl >> "$DIR/install.log" 2>&1 || { write_error "Need wget or curl"; ((ERRORS++)); }
+type wget >> "$LOG_FILE" 2>&1 || type curl >> "$LOG_FILE" 2>&1 || { write_error "Need wget or curl"; ((ERRORS++)); }
 if [ $ERRORS -ne 0 ]; then exit 1; fi
 
 export CC="gcc"
 export CXX="g++"
 export RANLIB=ranlib
+export LIBTOOL=libtool
+export LIBTOOLIZE=libtoolize
 
 COMPILE_FOR_ANDROID=no
 HAVE_MYSQLI="--enable-mysqlnd --with-mysqli=mysqlnd"
@@ -262,15 +274,18 @@ fi
 function download_file {
 	local url="$1" prefix="$2" cache="$prefix-${url##*/}"
 	if [ -n "$DOWNLOAD_CACHE" ]; then
-		mkdir -p "$DOWNLOAD_CACHE" >> "$DIR/install.log" 2>&1
+		mkdir -p "$DOWNLOAD_CACHE" >> "$LOG_FILE" 2>&1
 		if [ ! -f "$DOWNLOAD_CACHE/$cache" ]; then
-			_download_file "$url" > "$DOWNLOAD_CACHE/.temp" 2>> "$DIR/install.log"
-			mv "$DOWNLOAD_CACHE/.temp" "$DOWNLOAD_CACHE/$cache" >> "$DIR/install.log" 2>&1
+			_download_file "$url" > "$DOWNLOAD_CACHE/.temp" 2>> "$LOG_FILE"
+			mv "$DOWNLOAD_CACHE/.temp" "$DOWNLOAD_CACHE/$cache" >> "$LOG_FILE" 2>&1
 		fi
 		cat "$DOWNLOAD_CACHE/$cache"
 	else
-		_download_file "$url" 2>> "$DIR/install.log"
+		_download_file "$url" 2>> "$LOG_FILE"
 	fi
+}
+function download_from_mirror {
+	download_file "https://github.com/pmmp/DependencyMirror/releases/download/mirror/$1" "$2"
 }
 function download_github_src { download_file "https://github.com/$1/archive/$2.tar.gz" "$3"; }
 
@@ -343,14 +358,14 @@ export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_SYSTEM_LIBS="yes"
 export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS="yes"
 
-rm -rf "$BASE_BUILD_DIR" bin/ >> "$DIR/install.log" 2>&1
-mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$DIR/install.log" 2>&1
+rm -rf "$BASE_BUILD_DIR" bin/ >> "$LOG_FILE" 2>&1
+mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
 cd "$BUILD_DIR"
 set -e
 
 write_library "PHP" "$PHP_VERSION"
 write_download
-download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$DIR/install.log" 2>&1
+download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$LOG_FILE" 2>&1
 mv php-src-php-$PHP_VERSION php
 write_done
 
@@ -361,12 +376,12 @@ function build_zlib {
 	local d="./zlib-$ZLIB_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "madler/zlib" "v$ZLIB_VERSION" "zlib" | tar -zx >> "$DIR/install.log" 2>&1
+		download_github_src "madler/zlib" "v$ZLIB_VERSION" "zlib" | tar -zx >> "$LOG_FILE" 2>&1
 		write_configure; cd "$d"
-		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	[ "$DO_STATIC" != "yes" ] && rm -f "$INSTALL_DIR/lib/libz.a"
 	write_done
 }
@@ -379,14 +394,14 @@ function build_gmp {
 	local d="./gmp-$GMP_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://github.com/YoutuberPlay/PHP-Binaries/releases/download/pm3/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
+		download_file "https://github.com/YoutuberPlay/PHP-Binaries/releases/download/pm3/gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$LOG_FILE" 2>&1
 		write_configure; cd "$d"
 		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA \
 			--disable-posix-threads --enable-static --disable-shared \
-			$CONFIGURE_FLAGS ABI="$GMP_ABI" >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			$CONFIGURE_FLAGS ABI="$GMP_ABI" >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -398,13 +413,13 @@ function build_openssl {
 	local d="./openssl-$OPENSSL_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" "openssl" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" "openssl" | tar -zx >> "$LOG_FILE" 2>&1
 		write_configure; cd "$d"
 		RANLIB=$RANLIB $OPENSSL_CMD --prefix="$INSTALL_DIR" --openssldir="$INSTALL_DIR" \
-			--libdir="$INSTALL_DIR/lib" no-asm no-hw no-engine $EXTRA >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			--libdir="$INSTALL_DIR/lib" no-asm no-hw no-engine $EXTRA >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install_sw >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install_sw >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -414,9 +429,9 @@ function build_curl {
 	local d="./curl-$CURL_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "curl/curl" "$CURL_VERSION" "curl" | tar -zx >> "$DIR/install.log" 2>&1
+		download_github_src "curl/curl" "$CURL_VERSION" "curl" | tar -zx >> "$LOG_FILE" 2>&1
 		write_configure; cd "$d"
-		./buildconf --force >> "$DIR/install.log" 2>&1
+		./buildconf --force >> "$LOG_FILE" 2>&1
 		RANLIB=$RANLIB ./configure --disable-dependency-tracking \
 			--enable-ipv6 --enable-optimize --enable-http --enable-ftp \
 			--disable-dict --enable-file --without-librtmp --disable-gopher \
@@ -425,10 +440,10 @@ function build_curl {
 			--without-libidn --without-libidn2 --without-brotli --without-nghttp2 \
 			--without-zstd --with-zlib="$INSTALL_DIR" --with-ssl="$INSTALL_DIR" \
 			--enable-threaded-resolver --prefix="$INSTALL_DIR" \
-			$EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			$EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -438,14 +453,88 @@ function build_yaml {
 	local d="./libyaml-$YAML_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "yaml/libyaml" "$YAML_VERSION" "yaml" | tar -zx >> "$DIR/install.log" 2>&1
-		cd "$d"; ./bootstrap >> "$DIR/install.log" 2>&1
+		download_github_src "yaml/libyaml" "$YAML_VERSION" "yaml" | tar -zx >> "$LOG_FILE" 2>&1
+		cd "$d"; ./bootstrap >> "$LOG_FILE" 2>&1
 		write_configure
-		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
 		sed -i=".bak" 's/ tests win32/ win32/g' Makefile 2>/dev/null || true
-		write_compile; make -j $THREADS all >> "$DIR/install.log" 2>&1 && mark_cache
+		write_compile; make -j $THREADS all >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
+	write_done
+}
+
+function build_libxml2 {
+	write_library libxml2 "$LIBXML_VERSION"
+	local libxml2_dir="./libxml2-$LIBXML_VERSION"
+
+	if cant_use_cache "$libxml2_dir"; then
+		rm -rf "$libxml2_dir"
+		write_download
+		download_from_mirror "libxml2-v$LIBXML_VERSION.tar.gz" "libxml2" | tar -xz >> "$LOG_FILE" 2>&1
+		mv libxml2-v$LIBXML_VERSION "$libxml2_dir" >> "$LOG_FILE" 2>&1
+
+		write_configure
+		cd "$libxml2_dir"
+		if [ "$DO_STATIC" == "yes" ]; then
+			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
+		else
+			local EXTRA_FLAGS="--enable-shared=yes --enable-static=no"
+		fi
+		sed -i.bak 's{libtoolize --version{"$LIBTOOLIZE" --version{' autogen.sh
+		./autogen.sh --prefix="$INSTALL_DIR" \
+			--without-iconv \
+			--without-python \
+			--without-lzma \
+			--with-zlib="$INSTALL_DIR" \
+			--config-cache \
+			$EXTRA_FLAGS \
+			$CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+
+		write_compile
+		make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$libxml2_dir"
+	fi
+	write_install
+	make install >> "$LOG_FILE" 2>&1
+	cd "$LIB_BUILD_DIR"
+	write_done
+}
+
+function build_oniguruma {
+	write_library oniguruma "$ONIGURUMA_VERSION"
+	local onig_dir="./oniguruma-$ONIGURUMA_VERSION"
+
+	if cant_use_cache "$onig_dir"; then
+		rm -rf "$onig_dir"
+		mkdir -p "$onig_dir"
+		write_download
+		download_github_src "kkos/oniguruma" "v$ONIGURUMA_VERSION" "oniguruma" | tar -zx --strip-components=1 -C "$onig_dir" >> "$LOG_FILE" 2>&1
+
+		write_configure
+		cd "$onig_dir"
+		./autogen.sh >> "$LOG_FILE" 2>&1
+
+		if [ "$DO_STATIC" == "yes" ]; then
+			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
+		else
+			local EXTRA_FLAGS="--enable-shared=yes --enable-static=no"
+		fi
+		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
+			$EXTRA_FLAGS \
+			$CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+
+		write_compile
+		make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$onig_dir"
+	fi
+	write_install
+	make install >> "$LOG_FILE" 2>&1
+	cd "$LIB_BUILD_DIR"
 	write_done
 }
 
@@ -454,17 +543,17 @@ function build_leveldb {
 	local d="./leveldb-$EXT_LEVELDB_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_github_src "pmmp/leveldb" "$EXT_LEVELDB_VERSION" "leveldb" | tar -zx >> "$DIR/install.log" 2>&1
+		download_github_src "pmmp/leveldb" "$EXT_LEVELDB_VERSION" "leveldb" | tar -zx >> "$LOG_FILE" 2>&1
 		write_configure; cd "$d"
 		[ "$DO_STATIC" != "yes" ] && local EXTRA="-DBUILD_SHARED_LIBS=ON" || local EXTRA=""
 		cmake . -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
 			-DCMAKE_INSTALL_LIBDIR=lib -DLEVELDB_BUILD_TESTS=OFF \
 			-DLEVELDB_BUILD_BENCHMARKS=OFF -DLEVELDB_SNAPPY=OFF -DLEVELDB_ZSTD=OFF \
 			-DLEVELDB_TCMALLOC=OFF -DCMAKE_BUILD_TYPE=Release \
-			$CMAKE_GLOBAL_EXTRA_FLAGS $EXTRA >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			$CMAKE_GLOBAL_EXTRA_FLAGS $EXTRA >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -474,14 +563,14 @@ function build_libpng {
 	local d="./libpng-$LIBPNG_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://github.com/pnggroup/libpng/archive/refs/tags/v$LIBPNG_VERSION.tar.gz" "libpng" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://github.com/pnggroup/libpng/archive/refs/tags/v$LIBPNG_VERSION.tar.gz" "libpng" | tar -zx >> "$LOG_FILE" 2>&1
 		if [ ! -d "$d" ]; then mv "libpng-$LIBPNG_VERSION"* "$d" 2>/dev/null || true; fi
 		write_configure; cd "$d"
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" \
-			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -491,14 +580,14 @@ function build_libjpeg {
 	local d="./libjpeg-$LIBJPEG_VERSION"
 	if cant_use_cache "$d"; then
 		rm -rf "$d"; write_download
-		download_file "https://www.ijg.org/files/jpegsrc.v$LIBJPEG_VERSION.tar.gz" "libjpeg" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://www.ijg.org/files/jpegsrc.v$LIBJPEG_VERSION.tar.gz" "libjpeg" | tar -zx >> "$LOG_FILE" 2>&1
 		mv jpeg-$LIBJPEG_VERSION "$d"
 		write_configure; cd "$d"
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" \
-			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" $EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -507,7 +596,7 @@ function build_libzip {
     local d="./libzip-$LIBZIP_VERSION"
     if cant_use_cache "$d"; then
         rm -rf "$d"; write_download
-        download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$DIR/install.log" 2>&1
+        download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$LOG_FILE" 2>&1
         write_configure; cd "$d"
         cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
             -DCMAKE_INSTALL_LIBDIR=lib \
@@ -515,10 +604,10 @@ function build_libzip {
             $CMAKE_GLOBAL_EXTRA_FLAGS \
             -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF \
             -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
-            -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$DIR/install.log" 2>&1
-        write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+            -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$LOG_FILE" 2>&1
+        write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
     else write_caching; cd "$d"; fi
-    write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+    write_install; make install >> "$LOG_FILE" 2>&1; cd ..
     write_done
 }
 
@@ -536,7 +625,7 @@ function build_sqlite3 {
 			336*) YEAR=2021 ;;
 			*) YEAR=2019 ;;
 		esac
-		download_file "https://www.sqlite.org/$YEAR/sqlite-autoconf-$SQLITE3_VERSION.tar.gz" "sqlite3" | tar -zx >> "$DIR/install.log" 2>&1
+		download_file "https://www.sqlite.org/$YEAR/sqlite-autoconf-$SQLITE3_VERSION.tar.gz" "sqlite3" | tar -zx >> "$LOG_FILE" 2>&1
 		mv sqlite-autoconf-$SQLITE3_VERSION "$d"
 		write_configure; cd "$d"
 
@@ -549,13 +638,13 @@ function build_sqlite3 {
 		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" \
 			RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
 			--disable-dependency-tracking --enable-static-shell=no \
-			$EXTRA $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
-		write_compile; make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+			$EXTRA $CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
+		write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
 
 		export CFLAGS="$SAVED_CFLAGS"
 		export CXXFLAGS="$SAVED_CXXFLAGS"
 	else write_caching; cd "$d"; fi
-	write_install; make install >> "$DIR/install.log" 2>&1; cd ..
+	write_install; make install >> "$LOG_FILE" 2>&1; cd ..
 	write_done
 }
 
@@ -565,6 +654,11 @@ build_gmp
 build_openssl
 build_curl
 build_yaml
+
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+	build_libxml2
+	build_oniguruma
+fi
 
 if [ "$COMPILE_GD" == "yes" ]; then
 	build_libpng
@@ -583,7 +677,7 @@ build_sqlite3
 # ----- extensions -----
 function get_extension_tar_gz {
     echo -n "  $1: downloading $2..."
-    download_file "$3" "php-ext-$1" | tar -zx >> "$DIR/install.log" 2>&1
+    download_file "$3" "php-ext-$1" | tar -zx >> "$LOG_FILE" 2>&1
     mv "$4" "$BUILD_DIR/php/ext/$1" 2>/dev/null \
         || mv "${4,,}" "$BUILD_DIR/php/ext/$1" 2>/dev/null \
         || { write_error "ext $1: archive extracted to unexpected dir (expected $4)"; return 1; }
@@ -628,10 +722,10 @@ if [ -n "$EXT_RECURSIONGUARD_VERSION" ]; then
 fi
 if [ -n "$EXT_CRYPTO_VERSION" ]; then
 	echo -n "  crypto: downloading $EXT_CRYPTO_VERSION..."
-	git clone https://github.com/bukka/php-crypto.git "$BUILD_DIR/php/ext/crypto" >> "$DIR/install.log" 2>&1
+	git clone https://github.com/bukka/php-crypto.git "$BUILD_DIR/php/ext/crypto" >> "$LOG_FILE" 2>&1
 	cd "$BUILD_DIR/php/ext/crypto"
-	git checkout "$EXT_CRYPTO_VERSION" >> "$DIR/install.log" 2>&1
-	git submodule update --init --recursive >> "$DIR/install.log" 2>&1
+	git checkout "$EXT_CRYPTO_VERSION" >> "$LOG_FILE" 2>&1
+	git submodule update --init --recursive >> "$LOG_FILE" 2>&1
 	cd "$BUILD_DIR"
 	write_done
 fi
@@ -650,10 +744,10 @@ fi
 write_library "PHP" "$PHP_VERSION"
 write_configure
 cd "$BUILD_DIR/php"
-rm -f ./aclocal.m4 >> "$DIR/install.log" 2>&1
-rm -rf ./autom4te.cache/ >> "$DIR/install.log" 2>&1
-rm -f ./configure >> "$DIR/install.log" 2>&1
-./buildconf --force >> "$DIR/install.log" 2>&1
+rm -f ./aclocal.m4 >> "$LOG_FILE" 2>&1
+rm -rf ./autom4te.cache/ >> "$LOG_FILE" 2>&1
+rm -f ./configure >> "$LOG_FILE" 2>&1
+./buildconf --force >> "$LOG_FILE" 2>&1
 
 if [ "$DO_STATIC" == "yes" ]; then
 	if [ -z "$PKG_CONFIG" ]; then PKG_CONFIG="$(which pkg-config)" || true; fi
@@ -663,6 +757,36 @@ if [ "$DO_STATIC" == "yes" ]; then
 		chmod +x "$BUILD_DIR/pkg-config-wrapper"
 		export PKG_CONFIG="$BUILD_DIR/pkg-config-wrapper"
 	fi
+fi
+
+if [[ "$PHP_VERSION" == 7.4.* ]] && [[ "$DO_STATIC" == "yes" ]]; then
+	mkdir -p "$INSTALL_DIR/lib/pkgconfig"
+	cat > "$INSTALL_DIR/lib/pkgconfig/libcurl.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libcurl
+Description: Library to transfer files with ftp, http, etc.
+Version: 7.71.1
+Libs: -L\${libdir} -lcurl
+Libs.private: -L\${libdir} -lssl -lcrypto -lz -ldl -lpthread
+Cflags: -I\${includedir}
+EOF
+	cat > "$INSTALL_DIR/lib/pkgconfig/sqlite3.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: SQLite
+Description: SQL database engine
+Version: 3.36.0
+Libs: -L\${libdir} -lsqlite3
+Libs.private: -L\${libdir} -lpthread -ldl
+Cflags: -I\${includedir}
+EOF
 fi
 
 if [ "$IS_CROSSCOMPILE" == "yes" ]; then
@@ -687,18 +811,24 @@ fi
 ZIP_FLAG=""
 case "$PHP_VERSION" in
 	7.0.*) ZIP_FLAG="--enable-zip" ;;
-	7.2.*|7.3.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
-	7.4.*) ZIP_FLAG="--with-zip" ;;
+	7.2.*|7.3.*|7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
 esac
 
 SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
 
-XML_FLAGS="--disable-libxml --disable-xml --disable-dom --disable-simplexml --disable-xmlreader --disable-xmlwriter"
+case "$PHP_VERSION" in
+	7.4.*)
+		XML_FLAGS="--with-libxml --enable-xml --enable-dom --enable-simplexml --enable-xmlreader --enable-xmlwriter"
+		;;
+	*)
+		XML_FLAGS="--disable-libxml --disable-xml --disable-dom --disable-simplexml --disable-xmlreader --disable-xmlwriter"
+		;;
+esac
 
 PDO_FLAGS=""
 case "$PHP_VERSION" in
-	7.0.*|7.2.*|7.3.*) PDO_FLAGS="--disable-pdo --without-pdo-sqlite" ;;
-	7.4.*)              PDO_FLAGS="--with-pdo-sqlite=$INSTALL_DIR --with-pdo-mysql" ;;
+	7.4.*) PDO_FLAGS="--enable-pdo --with-pdo-sqlite=$INSTALL_DIR --with-pdo-mysql" ;;
+	*)     PDO_FLAGS="--disable-pdo --without-pdo-sqlite" ;;
 esac
 
 EMBEDDED_MYSQLI=""
@@ -720,10 +850,19 @@ EXTRA_EXT_FLAGS=""
 [ -n "$EXT_DS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-ds"
 [ -n "$EXT_WEAKREF_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-weakref"
 
-RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" ./configure \
+EXTRA_74_FLAGS=""
+CURL_CONFIGURE_FLAG="--with-curl=$INSTALL_DIR"
+PHP74_LDFLAGS_EXTRA=""
+if [[ "$PHP_VERSION" == 7.4.* ]]; then
+	EXTRA_74_FLAGS="--disable-mbregex --with-onig=$INSTALL_DIR"
+	CURL_CONFIGURE_FLAG="--with-curl"
+	PHP74_LDFLAGS_EXTRA="-L$INSTALL_DIR/lib"
+fi
+
+RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$PHP74_LDFLAGS_EXTRA $LDFLAGS" ./configure \
 --enable-inline-optimization \
 --prefix="$INSTALL_DIR" --exec-prefix="$INSTALL_DIR" \
---with-curl="$INSTALL_DIR" \
+$CURL_CONFIGURE_FLAG \
 --with-zlib="$INSTALL_DIR" --with-zlib-dir="$INSTALL_DIR" \
 --with-gmp="$INSTALL_DIR" \
 --with-yaml="$INSTALL_DIR" \
@@ -734,7 +873,7 @@ $HAS_LIBPNG $HAS_LIBJPEG $HAS_GD \
 $LEVELDB_FLAG \
 --without-readline --without-ncurses \
 $HAS_DEBUG \
---enable-mbstring --enable-calendar \
+--enable-mbstring --enable-calendar $EXTRA_74_FLAGS \
 $THREAD_EXT_FLAGS \
 --disable-fileinfo \
 $XML_FLAGS \
@@ -752,7 +891,7 @@ $HAVE_PCNTL $HAVE_MYSQLI \
 $EXTRA_EXT_FLAGS \
 $HAVE_VALGRIND \
 $PCNTL_EXTRA \
-$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+$CONFIGURE_FLAGS >> "$LOG_FILE" 2>&1
 
 write_compile
 if [ "$COMPILE_FOR_ANDROID" == "yes" ]; then
@@ -762,9 +901,9 @@ sed -i=".bak" 's/PHP_BINARIES. pharcmd$/PHP_BINARIES)/g' Makefile 2>/dev/null ||
 sed -i=".bak" 's/install-programs install-pharcmd$/install-programs/g' Makefile 2>/dev/null || true
 [ "$DO_STATIC" == "yes" ] && sed -i=".bak" 's/--mode=link $(CC)/--mode=link $(CXX)/g' Makefile 2>/dev/null || true
 
-make -j $THREADS >> "$DIR/install.log" 2>&1
+make -j $THREADS >> "$LOG_FILE" 2>&1
 write_install
-make install >> "$DIR/install.log" 2>&1
+make install >> "$LOG_FILE" 2>&1
 
 write_status "generating php.ini"
 TIMEZONE=$(date +%Z)
@@ -803,6 +942,9 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -f "$INSTALL_DIR/lib/"*.a "$INSTALL_DIR/lib/"*.la
 fi
 
-date >> "$DIR/install.log" 2>&1
+if [ "$ENABLE_DEBUG_LOG" -eq 1 ]; then
+	date >> "$LOG_FILE" 2>&1
+fi
+
 write_out "PocketMine" "You should start the server now using \"./start.sh\"."
 write_out "PocketMine" "If it doesn't work, please send the \"install.log\" file to the Bug Tracker."
