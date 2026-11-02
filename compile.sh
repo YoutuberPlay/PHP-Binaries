@@ -357,6 +357,9 @@ export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_SYSTEM_LIBS="yes"
 export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS="yes"
+if [[ "$PHP_VERSION" == 7.3.* ]]; then
+	export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
+fi
 
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$LOG_FILE" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
@@ -606,9 +609,12 @@ function build_libzip {
             -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
             -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$LOG_FILE" 2>&1
         write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
-        else write_caching; cd "$d"; fi
+    else 
+        write_caching; cd "$d"
+    fi
     write_install; make install >> "$LOG_FILE" 2>&1
-    if [[ "$PHP_VERSION" == 7.3.* ]] && [ ! -f "$INSTALL_DIR/lib/pkgconfig/libzip.pc" ]; then
+    
+    if [[ "$PHP_VERSION" == 7.2.* ]] || [[ "$PHP_VERSION" == 7.3.* ]]; then
         mkdir -p "$INSTALL_DIR/lib/pkgconfig"
         cat > "$INSTALL_DIR/lib/pkgconfig/libzip.pc" <<EOF
 prefix=$INSTALL_DIR
@@ -770,7 +776,11 @@ if [ "$DO_STATIC" == "yes" ]; then
 	if [ -z "$PKG_CONFIG" ]; then PKG_CONFIG="$(which pkg-config)" || true; fi
 	if [ ! -z "$PKG_CONFIG" ]; then
 		echo '#!/bin/sh' > "$BUILD_DIR/pkg-config-wrapper"
-		echo 'exec '$PKG_CONFIG' "$@" --static' >> "$BUILD_DIR/pkg-config-wrapper"
+		if [[ "$PHP_VERSION" == 7.3.* ]]; then
+			echo "exec \"$PKG_CONFIG\" --static \"\$@\"" >> "$BUILD_DIR/pkg-config-wrapper"
+		else
+			echo 'exec '$PKG_CONFIG' "$@" --static' >> "$BUILD_DIR/pkg-config-wrapper"
+		fi
 		chmod +x "$BUILD_DIR/pkg-config-wrapper"
 		export PKG_CONFIG="$BUILD_DIR/pkg-config-wrapper"
 	fi
@@ -819,7 +829,7 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 	mv ext/mysqlnd/config9.m4 ext/mysqlnd/config.m4 2>/dev/null || true
 	sed -i=".bak" "s{ext/mysqlnd/php_mysqlnd_config.h{config.h{" ext/mysqlnd/mysqlnd_portability.h 2>/dev/null || true
 elif [ "$DO_STATIC" == "yes" ]; then
-	export LIBS="$LIBS -ldl"
+	export LIBS="$LIBS -ldl -lz"
 fi
 
 [ "$IS_WINDOWS" != "yes" ] && HAVE_PCNTL="--enable-pcntl" || HAVE_PCNTL="--disable-pcntl"
@@ -828,8 +838,8 @@ fi
 ZIP_FLAG=""
 case "$PHP_VERSION" in
 	7.0.*) ZIP_FLAG="--enable-zip" ;;
-	7.2.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
-	7.3.*) ZIP_FLAG="--with-zip" ;;
+	7.2.*) ZIP_FLAG="--enable-zip" ;;
+	7.3.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
 	7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
 esac
 
