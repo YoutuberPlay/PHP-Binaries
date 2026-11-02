@@ -606,8 +606,25 @@ function build_libzip {
             -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
             -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$LOG_FILE" 2>&1
         write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
-    else write_caching; cd "$d"; fi
-    write_install; make install >> "$LOG_FILE" 2>&1; cd ..
+        else write_caching; cd "$d"; fi
+    write_install; make install >> "$LOG_FILE" 2>&1
+    if [[ "$PHP_VERSION" == 7.3.* ]] && [ ! -f "$INSTALL_DIR/lib/pkgconfig/libzip.pc" ]; then
+        mkdir -p "$INSTALL_DIR/lib/pkgconfig"
+        cat > "$INSTALL_DIR/lib/pkgconfig/libzip.pc" <<EOF
+prefix=$INSTALL_DIR
+exec_prefix=\${prefix}
+libdir=\${prefix}/lib
+includedir=\${prefix}/include
+
+Name: libzip
+Description: library for handling zip archives
+Version: $LIBZIP_VERSION
+Libs: -L\${libdir} -lzip
+Libs.private: -lz
+Cflags: -I\${includedir}
+EOF
+    fi
+    cd ..
     write_done
 }
 
@@ -811,7 +828,9 @@ fi
 ZIP_FLAG=""
 case "$PHP_VERSION" in
 	7.0.*) ZIP_FLAG="--enable-zip" ;;
-	7.2.*|7.3.*|7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
+	7.2.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
+	7.3.*) ZIP_FLAG="--with-zip" ;;
+	7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
 esac
 
 SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
