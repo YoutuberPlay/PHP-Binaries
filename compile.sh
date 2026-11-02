@@ -835,6 +835,11 @@ fi
 [ "$IS_WINDOWS" != "yes" ] && HAVE_PCNTL="--enable-pcntl" || HAVE_PCNTL="--disable-pcntl"
 [[ "$COMPILE_DEBUG" == "yes" ]] && HAS_DEBUG="--enable-debug" || HAS_DEBUG="--disable-debug"
 
+if [[ "$PHP_VERSION" == 7.3.* ]]; then
+	export ZIP_CFLAGS="-I$INSTALL_DIR/include"
+	export ZIP_LIBS="-L$INSTALL_DIR/lib -lzip"
+fi
+
 ZIP_FLAG=""
 case "$PHP_VERSION" in
 	7.0.*) ZIP_FLAG="--enable-zip" ;;
