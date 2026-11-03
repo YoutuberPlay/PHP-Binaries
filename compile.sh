@@ -859,10 +859,10 @@ fi
 
 ZIP_FLAG=""
 case "$PHP_VERSION" in
-	7.0.*) ZIP_FLAG="--enable-zip" ;;
-	7.2.*) ZIP_FLAG="--enable-zip" ;;
-	7.3.*) ZIP_FLAG="--with-libzip=$INSTALL_DIR" ;;
-	7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
+    7.0.*) ZIP_FLAG="--enable-zip" ;;
+    7.2.*) ZIP_FLAG="--enable-zip" ;;
+    7.3.*) ZIP_FLAG="--enable-zip --with-libzip=$INSTALL_DIR" ;;
+    7.4.*) ZIP_FLAG="--with-zip=$INSTALL_DIR" ;;
 esac
 
 SQLITE_FLAG="--with-sqlite3=$INSTALL_DIR"
