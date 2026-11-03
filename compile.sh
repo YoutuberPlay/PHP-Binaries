@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 1 = писать install.log, 0 = тихий режим (вывод в /dev/null)
-ENABLE_DEBUG_LOG=0
+ENABLE_DEBUG_LOG=1
 
 PHP_VERSIONS=("7.0.33" "7.2.34" "7.3.33" "7.4.33")
 PHP_VERSION_BASE="auto"
@@ -357,9 +357,7 @@ export LIBRARY_PATH="$INSTALL_DIR/lib:$LIBRARY_PATH"
 export PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig"
 export PKG_CONFIG_ALLOW_SYSTEM_LIBS="yes"
 export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS="yes"
-if [[ "$PHP_VERSION" == 7.3.* ]]; then
-	export PKG_CONFIG_LIBDIR="$INSTALL_DIR/lib/pkgconfig"
-fi
+unset PKG_CONFIG_LIBDIR
 
 rm -rf "$BASE_BUILD_DIR" bin/ >> "$LOG_FILE" 2>&1
 mkdir -p "$BUILD_DIR" "$LIB_BUILD_DIR" "$INSTALL_DIR" >> "$LOG_FILE" 2>&1
@@ -597,25 +595,48 @@ function build_libjpeg {
 function build_libzip {
     write_library libzip "$LIBZIP_VERSION"
     local d="./libzip-$LIBZIP_VERSION"
+
     if cant_use_cache "$d"; then
-        rm -rf "$d"; write_download
+        rm -rf "$d"
+        write_download
+
         download_file "https://libzip.org/download/libzip-$LIBZIP_VERSION.tar.gz" "libzip" | tar -zx >> "$LOG_FILE" 2>&1
-        write_configure; cd "$d"
-        cmake . -DCMAKE_PREFIX_PATH="$INSTALL_DIR" -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+
+        write_configure
+        cd "$d"
+
+        cmake . \
+            -DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
             -DCMAKE_INSTALL_LIBDIR=lib \
-            -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON \
-            $CMAKE_GLOBAL_EXTRA_FLAGS \
-            -DBUILD_TOOLS=OFF -DBUILD_REGRESS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOC=OFF \
-            -DENABLE_BZIP2=OFF -DENABLE_COMMONCRYPTO=OFF -DENABLE_GNUTLS=OFF \
-            -DENABLE_MBEDTLS=OFF -DENABLE_LZMA=OFF -DENABLE_ZSTD=OFF >> "$LOG_FILE" 2>&1
-        write_compile; make -j $THREADS >> "$LOG_FILE" 2>&1 && mark_cache
-    else 
-        write_caching; cd "$d"
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_TOOLS=OFF \
+            -DBUILD_REGRESS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_DOC=OFF \
+            -DENABLE_BZIP2=OFF \
+            -DENABLE_COMMONCRYPTO=OFF \
+            -DENABLE_GNUTLS=OFF \
+            -DENABLE_MBEDTLS=OFF \
+            -DENABLE_LZMA=OFF \
+            -DENABLE_ZSTD=OFF \
+            $CMAKE_GLOBAL_EXTRA_FLAGS >> "$LOG_FILE" 2>&1
+
+        write_compile
+        make -j $THREADS >> "$LOG_FILE" 2>&1
+        mark_cache
+    else
+        write_caching
+        cd "$d"
     fi
-    write_install; make install >> "$LOG_FILE" 2>&1
-    
+
+    write_install
+    make install >> "$LOG_FILE" 2>&1
+
     if [[ "$PHP_VERSION" == 7.2.* ]] || [[ "$PHP_VERSION" == 7.3.* ]]; then
         mkdir -p "$INSTALL_DIR/lib/pkgconfig"
+
         cat > "$INSTALL_DIR/lib/pkgconfig/libzip.pc" <<EOF
 prefix=$INSTALL_DIR
 exec_prefix=\${prefix}
@@ -630,6 +651,7 @@ Libs.private: -lz
 Cflags: -I\${includedir}
 EOF
     fi
+
     cd ..
     write_done
 }
@@ -886,6 +908,23 @@ if [[ "$PHP_VERSION" == 7.4.* ]]; then
 	EXTRA_74_FLAGS="--disable-mbregex --with-onig=$INSTALL_DIR"
 	CURL_CONFIGURE_FLAG="--with-curl"
 	PHP74_LDFLAGS_EXTRA="-L$INSTALL_DIR/lib"
+fi
+
+if [[ "$PHP_VERSION" == 7.3.* ]]; then
+    echo "[ZIP] Checking libzip..."
+
+    if ! pkg-config --exists libzip; then
+        write_error "libzip not found by pkg-config"
+        exit 1
+    fi
+
+    if [ ! -f "$INSTALL_DIR/include/zip.h" ]; then
+        write_error "libzip/include/zip.h not found"
+        exit 1
+    fi
+
+    echo "[ZIP] libzip version: $(pkg-config --modversion libzip)"
+    echo "[ZIP] libzip detected successfully"
 fi
 
 RANLIB=$RANLIB CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$PHP74_LDFLAGS_EXTRA $LDFLAGS" ./configure \
