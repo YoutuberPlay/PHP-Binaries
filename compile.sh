@@ -302,8 +302,8 @@ if [ "$IS_CROSSCOMPILE" == "yes" ]; then
 		[ -z "$mtune" ] && mtune=generic
 		TOOLCHAIN_PREFIX="aarch64-linux-musl"
 		CONFIGURE_FLAGS="--host=$TOOLCHAIN_PREFIX"
-		CFLAGS="-static $CFLAGS"
-		CXXFLAGS="-static $CXXFLAGS"
+		CFLAGS="-static $CFLAGS -march=$march -mtune=$mtune"
+		CXXFLAGS="-static $CXXFLAGS -march=$march -mtune=$mtune"
 		LDFLAGS="-static -static-libgcc -Wl,-static"
 		DO_STATIC="yes"
 		OPENSSL_TARGET="linux-aarch64"
@@ -347,7 +347,11 @@ fi
 [ -z "$LDFLAGS" ] && LDFLAGS=""
 
 if [ "$DO_OPTIMIZE" != "no" ]; then
-	CFLAGS="$CFLAGS -O2 -ffast-math -ftree-vectorize -fomit-frame-pointer -funswitch-loops -fivopts -funsafe-loop-optimizations -fpredictive-commoning -ftracer -ftree-loop-im -frename-registers -fcx-limited-range"
+	CFLAGS="$CFLAGS -O2 -fno-gcse -fno-math-errno -funsafe-math-optimizations \
+		-fno-signed-zeros -fno-trapping-math -ffinite-math-only -fno-rounding-math \
+		-fno-signaling-nans -ftree-vectorize -fomit-frame-pointer -funswitch-loops \
+		-fivopts -funsafe-loop-optimizations -fpredictive-commoning -ftracer \
+		-ftree-loop-im -frename-registers -fcx-limited-range"
 fi
 
 export CC CXX CFLAGS CXXFLAGS LDFLAGS CPPFLAGS
