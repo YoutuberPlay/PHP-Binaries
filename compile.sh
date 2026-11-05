@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 1 = писать install.log, 0 = тихий режим (вывод в /dev/null)
-ENABLE_DEBUG_LOG=0
+ENABLE_DEBUG_LOG=1
 
 PHP_VERSIONS=("7.0.33" "7.2.34" "7.3.33" "7.4.33")
 PHP_VERSION_BASE="auto"
