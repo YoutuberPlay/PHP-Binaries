@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 1 = писать install.log, 0 = тихий режим (вывод в /dev/null)
-ENABLE_DEBUG_LOG=1
+ENABLE_DEBUG_LOG=0
 
 PHP_VERSIONS=("7.0.33" "7.2.34" "7.3.33" "7.4.33")
 PHP_VERSION_BASE="auto"
@@ -44,7 +44,7 @@ LIBZIP_VERSION_70="1.8.0"
 EXT_PTHREADS_VERSION_70="3.1.6"
 EXT_YAML_VERSION_70="2.0.2"
 EXT_LEVELDB_VERSION_70=""
-EXT_CHUNKUTILS_VERSION_70=""
+EXT_CHUNKUTILS_VERSION_70="0.1.0"
 EXT_XDEBUG_VERSION_70=""
 EXT_IGBINARY_VERSION_70=""
 EXT_CRYPTO_VERSION_70=""
@@ -64,7 +64,7 @@ LIBZIP_VERSION_72="1.8.0"
 EXT_PTHREADS_VERSION_72="3.2.0"
 EXT_YAML_VERSION_72="2.0.4"
 EXT_LEVELDB_VERSION_72="1c7564468b41610da4f498430e795ca4de0931ff"
-EXT_CHUNKUTILS_VERSION_72=""
+EXT_CHUNKUTILS_VERSION_72="0.1.0"
 EXT_XDEBUG_VERSION_72=""
 EXT_IGBINARY_VERSION_72="3.0.1"
 EXT_CRYPTO_VERSION_72="0.3.1"
@@ -84,7 +84,7 @@ LIBZIP_VERSION_73="1.8.0"
 EXT_PTHREADS_VERSION_73="3.2.0"
 EXT_YAML_VERSION_73="2.0.4"
 EXT_LEVELDB_VERSION_73="1c7564468b41610da4f498430e795ca4de0931ff"
-EXT_CHUNKUTILS_VERSION_73="0.3.5"
+EXT_CHUNKUTILS_VERSION_73="0.1.0"
 EXT_XDEBUG_VERSION_73=""
 EXT_IGBINARY_VERSION_73="3.0.1"
 EXT_CRYPTO_VERSION_73="0.3.1"
@@ -104,7 +104,7 @@ LIBZIP_VERSION_74="1.8.0"
 EXT_PTHREADS_VERSION_74="3.2.0"
 EXT_YAML_VERSION_74="2.2.1"
 EXT_LEVELDB_VERSION_74="1c7564468b41610da4f498430e795ca4de0931ff"
-EXT_CHUNKUTILS_VERSION_74=""
+EXT_CHUNKUTILS_VERSION_74="0.1.0"
 EXT_XDEBUG_VERSION_74=""
 EXT_IGBINARY_VERSION_74="3.2.4"
 EXT_CRYPTO_VERSION_74="0.3.2"
@@ -740,14 +740,9 @@ cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
 case "$PHP_VERSION" in
-	7.3.*)
+	7.3.*|7.4.*)
 		echo -n "  pthreads: downloading krakjoe-final (pmmp/ext-pmmpthread)..."
 		get_github_extension "pthreads" "krakjoe-final" "pmmp" "ext-pmmpthread"
-		THREAD_EXT_FLAGS="--enable-pthreads"
-		;;
-	7.4.*)
-		echo -n "  pthreads: downloading 4.0.0 (pmmp/ext-pmmpthread)..."
-		get_github_extension "pthreads" "4.0.0" "pmmp" "ext-pmmpthread"
 		THREAD_EXT_FLAGS="--enable-pthreads"
 		;;
 	*)
@@ -757,7 +752,7 @@ case "$PHP_VERSION" in
 esac
 
 if [ -n "$EXT_CHUNKUTILS_VERSION" ]; then
-	get_github_extension "chunkutils2" "$EXT_CHUNKUTILS_VERSION" "pmmp" "ext-chunkutils2"
+	get_github_extension "chunkutils" "$EXT_CHUNKUTILS_VERSION" "pmmp" "PocketMine-C-ChunkUtils"
 fi
 
 if [ -n "$EXT_YAML_VERSION" ]; then
@@ -898,7 +893,7 @@ LEVELDB_FLAG=""
 [ -n "$EXT_LEVELDB_VERSION" ] && LEVELDB_FLAG="--with-leveldb=$INSTALL_DIR"
 
 EXTRA_EXT_FLAGS=""
-[ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils2"
+[ -n "$EXT_CHUNKUTILS_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-pocketmine-chunkutils"
 [ -n "$EXT_IGBINARY_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-igbinary"
 [ -n "$EXT_CRYPTO_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --with-crypto"
 [ -n "$EXT_RECURSIONGUARD_VERSION" ] && EXTRA_EXT_FLAGS="$EXTRA_EXT_FLAGS --enable-recursionguard"
